@@ -28,6 +28,10 @@ static const char* banner;
 static const char* banner2;
 static int banner_t;
 static int level_squish;
+static int lvlup, lvl_sel;      // level-up popup showing, and its cursor
+static int lightning_t;
+#define MAX_WX 12
+static struct { s16 x, y; } wx[MAX_WX];   // weather particles (screen space)
 
 enum { RS_FREE, RS_STOMP, RS_SLAM, RS_CLAP, RS_EYE, RS_DEAD };
 static struct {
@@ -53,7 +57,7 @@ typedef struct {
 static Shot sh[MAX_SHOT];
 
 #define MAX_FX 18
-enum { K_BOOM, K_POP, K_SPARK, K_DUST };
+enum { K_BOOM, K_POP, K_SPARK, K_DUST, K_PUFF, K_FLASH };
 typedef struct {
     u8 on, kind;
     int x, y, vx, t;
@@ -73,7 +77,7 @@ typedef struct {
     u8 atk[3];
     u8 proj, beam, speed;
 } BossDef;
-static const BossDef bdef[15] = {
+static const BossDef bdef[BOSS_COUNT + 1] = {
     { { A_CHARGE, A_SHOT, A_CHARGE }, PJ_RIVET, PJ_RIVET, 2 },   // IRON MAULER
     { { A_SHOT, A_CHARGE, A_FAN }, PJ_SAW, PJ_SAW, 3 },          // SAWBLADE
     { { A_BEAM, A_LOB, A_SHOT }, PJ_FIRE, PJ_FIRE, 2 },          // BLAZE HORN
@@ -88,6 +92,12 @@ static const BossDef bdef[15] = {
     { { A_SHOT, A_CHARGE, A_RAIN }, PJ_SCYTHE, PJ_SCYTHE, 3 },   // GRIM REAPER
     { { A_FAN, A_BEAM, A_SHOT }, PJ_NOTE, PJ_SOUND, 3 },         // HEAVY METAL
     { { A_CHARGE, A_JUMP, A_FAN }, PJ_RIVET, PJ_RIVET, 3 },      // STEEL TITAN
+    { { A_FAN, A_RAIN, A_CHARGE }, PJ_ICE, PJ_ICE, 1 },          // BLIZZARD BEAST
+    { { A_SHOT, A_CHARGE, A_JUMP }, PJ_SHURIKEN, PJ_SHURIKEN, 3 }, // NEON NINJA
+    { { A_LOB, A_RAIN, A_SHOT }, PJ_ROCK, PJ_ROCK, 1 },          // SCRAP KING
+    { { A_SHOT, A_BEAM, A_FAN }, PJ_LASER, PJ_LASER, 2 },        // CYCLOPS
+    { { A_BEAM, A_LOB, A_JUMP }, PJ_FIRE, PJ_FIRE, 2 },          // DRAGON-X
+    { { A_JUMP, A_CHARGE, A_RAIN }, PJ_FIRE, PJ_FIRE, 2 },       // INFERNO KING
     { { A_FAN, A_RAIN, A_JUMP }, PJ_MISSILE, PJ_FIRE, 3 },       // MEGA ROBOT
 };
 
@@ -100,13 +110,13 @@ static struct {
 // upgrade tables (index = upgrade level)
 static const u8 hand_cd[4] = { 14, 14, 9, 9 };
 static const u8 hand_n[4] = { 1, 2, 2, 3 };
-static const u8 eye_dmg[4] = { 1, 2, 2, 3 };
+static const u8 eye_dmg[4] = { 2, 3, 3, 4 };
 static const u8 eye_cool[4] = { 110, 100, 60, 60 };
 static const u8 eye_len[4] = { 48, 48, 48, 64 };
 static const u8 stomp_w[4] = { 32, 44, 56, 70 };
-static const u8 stomp_dmg[4] = { 3, 4, 6, 8 };
+static const u8 stomp_dmg[4] = { 5, 7, 9, 12 };
 static const u8 slam_r[4] = { 80, 100, 120, 150 };
-static const u8 slam_dmg[4] = { 6, 8, 10, 14 };
+static const u8 slam_dmg[4] = { 10, 13, 16, 20 };
 static const u8 slam_cool[4] = { 150, 150, 100, 80 };
 static const u16 walk_spd[3] = { 320, 384, 448 };
 
@@ -242,7 +252,7 @@ static void boss_frame_upload(void) {
 static void boss_start(int id) {
     B.on = 1;
     B.id = id;
-    B.mega = id == 14;
+    B.mega = id == MEGA_ID;
     B.st = BS_ENTER;
     B.t = 0;
     B.x = F8(cam + 290);
@@ -250,9 +260,9 @@ static void boss_start(int id) {
     B.y = F8(B.gy);
     B.vx = B.vy = 0;
     B.face = -1;
-    if (B.mega) B.maxhp = 600;
-    else if (level == 15) B.maxhp = (70 + 14 * (id + 1)) * 3 / 5;
-    else B.maxhp = 70 + 14 * level;
+    if (B.mega) B.maxhp = 700;
+    else if (level == LAST_LEVEL) B.maxhp = (60 + 13 * (id + 1)) / 2;
+    else B.maxhp = 60 + 13 * level;
     B.hp = B.maxhp;
     B.cd = 60;
     B.stun = 0;
@@ -266,8 +276,14 @@ static void boss_start(int id) {
     boss_frame_upload();
 }
 
+static void gain_xp(int n) {
+    if (level == LAST_LEVEL && plv > 40) return;
+    xp += n;
+}
+
 static void boss_damage(int n) {
     if (!B.on || B.st == BS_DIE || B.st == BS_ENTER) return;
+    n = n * (4 + up_lv[U_POWER]) / 4;
     B.hp -= n;
     B.flash = 4;
     if (B.hp <= 0) {
@@ -276,6 +292,7 @@ static void boss_damage(int n) {
         B.t = 0;
         B.vx = B.vy = 0;
         sfx(SFX_BIGBOOM);
+        gain_xp(B.mega ? 20 : 10);
     }
 }
 
@@ -296,7 +313,7 @@ static const s16 fan_c[7] = { 197, 222, 247, 256, 247, 222, 197 };
 static const s16 fan_s[7] = { -165, -128, -66, 0, 66, 128, 165 };
 
 static void boss_attack_start(void) {
-    const BossDef* d = &bdef[B.mega ? 14 : B.id];
+    const BossDef* d = &bdef[B.mega ? MEGA_ID : B.id];
     if (B.mega) {
         static const u8 cyc[7] = { A_FAN, A_SHOT, A_RAIN, A_CHARGE, A_LOB, A_JUMP, A_BEAM };
         B.atk = cyc[B.atk_i % 7];
@@ -312,7 +329,7 @@ static void boss_attack_start(void) {
 
 static void boss_update(void) {
     if (!B.on) return;
-    const BossDef* d = &bdef[B.mega ? 14 : B.id];
+    const BossDef* d = &bdef[B.mega ? MEGA_ID : B.id];
     int bx = B.x >> 8, by = B.y >> 8;
     int rx = R.x >> 8;
     int hand_x = bx + B.face * (B.mega ? 40 : 22), hand_y = by - (B.mega ? 64 : 40);
@@ -386,7 +403,7 @@ static void boss_update(void) {
     }
     int dx = rx - bx;
     if (B.st != BS_ATK || B.atk != A_CHARGE) B.face = dx >= 0 ? 1 : -1;
-    int speed = 128 + d->speed * 48;
+    int speed = 72 + d->speed * 26;   // side to side: about 0.4 to 0.6 px per frame
     switch (B.st) {
     case BS_MOVE: {
         int dist = iabs(dx);
@@ -394,8 +411,8 @@ static void boss_update(void) {
         if (dist > 115) { B.x += sgn(dx) * speed; moving = 1; }
         else if (dist < 60) { B.x -= sgn(dx) * speed; moving = 1; }
         // drift toward the robot's lane
-        if (B.gy < R.gy && (B.t & 1)) { B.gy++; B.y += 256; moving = 1; }
-        if (B.gy > R.gy && (B.t & 1)) { B.gy--; B.y -= 256; moving = 1; }
+        if (B.gy < R.gy && (B.t % 3) == 0) { B.gy++; B.y += 256; moving = 1; }
+        if (B.gy > R.gy && (B.t % 3) == 0) { B.gy--; B.y -= 256; moving = 1; }
         B.t++;
         B.frame = moving ? ((B.t >> 4) & 1) : 0;
         if (--B.cd <= 0) boss_attack_start();
@@ -407,12 +424,12 @@ static void boss_update(void) {
             B.st = BS_ATK;
             B.t = 0;
             if (B.atk == A_CHARGE) {
-                B.vx = B.face * (B.mega ? 5 : 4) * 256;
+                B.vx = B.face * (B.mega ? 4 : 3) * 256;
                 sfx(SFX_SLAM);
             } else if (B.atk == A_JUMP) {
                 B.air = 1;
                 B.vy = -(B.mega ? 6 : 7) * 256;
-                B.vx = idiv((rx - bx) * 256, 50);
+                B.vx = idiv((rx - bx) * 256, 64);
             }
         }
         break;
@@ -553,6 +570,7 @@ static void enemy_kill(Enemy* e, int squish) {
     }
     squished++;
     level_squish++;
+    gain_xp(1);
     if (rndr(100) < 12) pickup_add(PK_HEART, e->x >> 8, (e->y >> 8) - 20, e->gy);
 }
 
@@ -681,8 +699,9 @@ static void fire_bolts(void) {
         s->vx = vx;
         s->vy = vy + spread[n - 1][k];
         s->life = 80;
-        s->dmg = up_lv[U_HAND] >= 3 ? 2 : 1;
+        s->dmg = up_lv[U_HAND] >= 3 ? 3 : 2;
     }
+    fx_add(K_FLASH, hx - 8, hy - 8, 0);
     sfx(SFX_LASER);
 }
 
@@ -891,7 +910,12 @@ static void robot_update(void) {
         int wf = (R.walk >> 11) & 3;
         // heavy footfalls: a little shake each time a foot lands
         static int last_wf;
-        if (R.moving && wf != last_wf && (wf & 1) == 0) shake(3, 1);
+        if (R.moving && wf != last_wf && (wf & 1) == 0) {
+            shake(3, 1);
+            // dust puff under the foot that just landed
+            int foot = wf == 0 ? 18 : -14;
+            fx_add(K_PUFF, (R.x >> 8) + R.face * foot - 8, R.gy - 14, 0);
+        }
         last_wf = wf;
         if (R.hurt_t > 6) R.frame = RF_HURT;
         else if (R.shoot_t) R.frame = R.moving ? RF_SHOOT1 + wf : RF_SHOOT;
@@ -1059,12 +1083,16 @@ static void fx_update(void) {
         if (!f->on) continue;
         f->t++;
         f->x += f->vx;
-        int life = f->kind == K_BOOM ? 25 : f->kind == K_POP ? 16 : f->kind == K_SPARK ? 14 : 18;
+        int life = f->kind == K_BOOM ? 25 : f->kind == K_POP ? 16 : f->kind == K_SPARK ? 14 :
+                   f->kind == K_PUFF ? 15 : f->kind == K_FLASH ? 4 : 18;
         if (f->t >= life) f->on = 0;
     }
 }
 
 // ---------------------------------------------------------------- drawing
+
+static void draw_weather(void);
+static void draw_shadows(int sx0, int sy0);
 
 static void draw_proj(Shot* s, int sx, int sy) {
     int k = s->kind;
@@ -1149,8 +1177,11 @@ static void draw_world(void) {
         if (f->kind == K_BOOM) spr(x, y, SQ, 2, T_FX + FX_BOOM + (f->t / 5) * 16, PAL_FX, 0, 0);
         else if (f->kind == K_POP) spr(x, y, SQ, 1, T_FX + FX_POP + (f->t / 4) * 4, PAL_FX, 0, 0);
         else if (f->kind == K_SPARK) spr(x, y - f->t, SQ, 1, T_FX + FX_SPARK + ((f->t >> 2) & 1) * 4, PAL_FX, 0, 0);
+        else if (f->kind == K_PUFF) spr(x, y, SQ, 1, T_FX + FX_PUFF + (f->t / 5) * 4, PAL_FX, f->vx < 0, 0);
+        else if (f->kind == K_FLASH) spr(x, y, SQ, 1, T_FX + FX_MFLASH + (f->t >> 1) * 4, PAL_FX, 0, 0);
         else spr(x, y, WIDE, 2, T_FX + FX_DUST + ((f->t >> 3) & 1) * 8, PAL_FX, f->vx < 0, 0);
     }
+    draw_weather();
     // shots
     for (int i = 0; i < MAX_SHOT; i++) {
         Shot* s = &sh[i];
@@ -1207,6 +1238,7 @@ static void draw_world(void) {
         spr(x, y, SQ, 1, T_FX + (p->kind == PK_CELL ? FX_CELL : FX_HEART), PAL_FX, 0, 0);
     }
     draw_enemies(sx0, sy0, 0);
+    draw_shadows(sx0, sy0);
 }
 
 static void draw_bar(int x, int y, int n, int val, int max, int base) {
@@ -1233,9 +1265,16 @@ static void hud(void) {
     num_str(b + 3, level);
     txt(24, 0, "      ", 0);
     txt(24, 0, b, 0);
+    // experience: kills fill the bar; a full bar means a level up
+    txt(0, 1, "XP", 0);
+    draw_bar(2, 1, 6, xp, xp_need(), HUD_BAR_XP);
+    char pb[8] = "PL ";
+    num_str(pb + 3, plv + 1);
+    txt(9, 1, "     ", 0);
+    txt(9, 1, pb, 1);
     if (B.on && B.st != BS_ENTER) {
         put_tile(0, 2, HUD_SKULL);
-        txt(1, 2, boss_names[B.mega ? 14 : B.id], 1);
+        txt(1, 2, boss_names[B.mega ? MEGA_ID : B.id], 1);
         draw_bar(1, 3, 16, B.hp, B.maxhp, HUD_BAR_BOSS);
     } else {
         txt_clear_rows(2, 3);
@@ -1251,25 +1290,83 @@ static void hud(void) {
     }
 }
 
+static void panel_rows(int y0, int y1) {
+    for (int y = y0; y <= y1; y++)
+        for (int x = 1; x <= 28; x++) put_tile(x, y, y == y0 ? HUD_PANEL_TOP : y == y1 ? HUD_PANEL_BOT : HUD_PANEL);
+}
+
 static void pause_screen(int on) {
-    txt_clear_rows(4, 17);
+    txt_clear_rows(4, 19);
     if (!on) return;
-    for (int y = 4; y <= 17; y++)
-        for (int x = 2; x <= 27; x++) put_tile(x, y, y == 4 ? HUD_PANEL_TOP : y == 17 ? HUD_PANEL_BOT : HUD_PANEL);
+    panel_rows(4, 18);
     txt_big_center(5, "PAUSED");
-    txt(4, 8, "A STOMP     B HAND LASERS", 1);
-    txt(4, 9, "R EYE LASERS (BOSSES!)", 1);
-    txt(4, 10, "L SLAM      L+R THUNDERCLAP", 1);
-    txt(4, 13, "SELECT  MUSIC", 0);
-    txt(18, 13, music_on ? "ON " : "OFF", 1);
-    txt(4, 15, "START   KEEP PLAYING", 0);
+    txt(3, 8, "A STOMP    B HAND LASERS", 3);
+    txt(3, 10, "R EYE LASERS (BOSSES!)", 3);
+    txt(3, 12, "L SLAM     L+R THUNDER", 3);
+    txt(3, 14, "SELECT  MUSIC", 2);
+    txt(17, 14, music_on ? "ON " : "OFF", 3);
+    txt(3, 16, "START   KEEP PLAYING", 2);
+}
+
+static void levelup_screen(void) {
+    txt_clear_rows(4, 19);
+    panel_rows(4, 19);
+    txt_big_center(5, "LEVEL UP!");
+    draw_upgrade_choices(8, lvl_sel, 1);
+}
+
+// weather for each area: embers, rain, dust, sparks, snow, none, embers
+static void weather_update(int dcam) {
+    static const s8 vx[THEME_COUNT] = { -1, -2, -3, -1, -1, 0, 0 };
+    static const s8 vy[THEME_COUNT] = { -1, 5, 0, -1, 1, 0, -2 };
+    if (theme == 5) return;
+    for (int i = 0; i < MAX_WX; i++) {
+        wx[i].x += vx[theme] - dcam + ((theme == 4 || theme == 0) && ((frame + i * 7) & 31) < 16 ? 1 : 0);
+        wx[i].y += vy[theme] + (theme == 4 && (frame & 1));
+        if (wx[i].y > 160) { wx[i].y = -8; wx[i].x = rndr(260); }
+        if (wx[i].y < -8) { wx[i].y = 160; wx[i].x = rndr(260); }
+        if (wx[i].x < -8) wx[i].x += 256;
+        if (wx[i].x > 248) wx[i].x -= 256;
+    }
+    if (theme == 1) {
+        if (lightning_t > 0) {
+            lightning_t--;
+            if (lightning_t == 3) fade(1, 9);
+            if (lightning_t == 1) fade(0, 0);
+        } else if (rndr(300) == 0) {
+            lightning_t = 5;
+            sfx(SFX_BOOM);
+        }
+    }
+}
+
+static void draw_weather(void) {
+    static const u8 kind[THEME_COUNT] = { 2, 0, 3, 3, 1, 0, 2 };
+    if (theme == 5) return;
+    for (int i = 0; i < MAX_WX; i++)
+        spr(wx[i].x, wx[i].y, SQ, 0, T_FX + FX_WEATHER + kind[theme], PAL_FX, 0, 0);
+}
+
+// dithered shadows on the street, behind everything (shows lanes and how high fliers are)
+static void draw_shadows(int sx0, int sy0) {
+    int x = (R.x >> 8) + sx0;
+    spr(x - 16, R.gy - 4 + sy0, WIDE, 1, T_FX + FX_SHADOW32, PAL_FX, 0, 0);
+    if (B.on) {
+        int bx = (B.x >> 8) + sx0, n = B.mega ? 3 : 2;
+        for (int k = 0; k < n; k++) spr(bx - n * 16 + k * 32, B.gy - 4 + sy0, WIDE, 1, T_FX + FX_SHADOW32, PAL_FX, 0, 0);
+    }
+    for (int i = 0; i < MAX_EN; i++) {
+        Enemy* e = &en[i];
+        if (e->st == ES_OFF) continue;
+        spr((e->x >> 8) + sx0 - 8, e->gy - 4 + sy0, WIDE, 0, T_FX + FX_SHADOW16, PAL_FX, 0, 0);
+    }
 }
 
 // ---------------------------------------------------------------- level flow
 
 void play_enter(void) {
     theme = (level - 1) / 3;
-    if (theme > 4) theme = 4;
+    if (theme > THEME_COUNT - 1) theme = THEME_COUNT - 1;
     video_play(theme);
     for (int i = 0; i < MAX_EN; i++) en[i].st = ES_OFF;
     for (int i = 0; i < MAX_SHOT; i++) sh[i].on = 0;
@@ -1302,13 +1399,19 @@ void play_enter(void) {
     shake_t = shake_m = 0;
     banner_t = 0;
     level_squish = 0;
+    lvlup = 0;
+    lightning_t = 0;
+    for (int i = 0; i < MAX_WX; i++) {
+        wx[i].x = rndr(240);
+        wx[i].y = rndr(160);
+    }
     upload((void*)(OBJ_TILES + T_GLASS * 16), glasses_tiles, 32);
     upload((void*)(OBJ_TILES + T_ENEMY * 16), enemy_tiles, sizeof(enemy_tiles) / 4);
     upload((void*)(OBJ_TILES + T_FX * 16), fx_tiles, sizeof(fx_tiles) / 4);
     upload((void*)(OBJ_TILES + T_PROJ * 16), proj_tiles, sizeof(proj_tiles) / 4);
     OBJ_PAL[9] = robot_pal[9];
     OBJ_PAL[10] = robot_pal[10];
-    if (level == 15) {
+    if (level == LAST_LEVEL) {
         phase = PH_RUSHGAP;
         phase_t = 60;
         music(SONG_BOSS);
@@ -1327,6 +1430,22 @@ int play_update(void) {
         pause_screen(paused);
         if (!paused) banner_t = banner_t ? banner_t : 0;
         sfx(SFX_SELECT);
+    }
+    if (lvlup) {
+        if (pressed & KEY_UP) { lvl_sel = (lvl_sel + up_count - 1) % up_count; sfx(SFX_SELECT); levelup_screen(); }
+        if (pressed & KEY_DOWN) { lvl_sel = (lvl_sel + 1) % up_count; sfx(SFX_SELECT); levelup_screen(); }
+        if (++lvlup > 30 && (pressed & KEY_A)) {
+            int u = take_upgrade(lvl_sel);
+            if (u == U_ARMOR) { R.maxhp += 5; R.hp += 5; }
+            else if (u == U_THUNDER) R.claps++;
+            else if (u == U_REPAIR) R.hp = R.maxhp;
+            sfx(SFX_PICKUP);
+            lvlup = 0;
+            txt_clear_rows(4, 19);
+            banner_t = 0;
+        }
+        draw_world();
+        return EV_NONE;
     }
     if (paused) {
         if (pressed & KEY_SELECT) {
@@ -1403,7 +1522,7 @@ int play_update(void) {
         // fall through: the boss can already be beaten during the warning
     case PH_BOSS:
         if (!B.on) {
-            if (level == 15 && rush_i < 14) {
+            if (level == LAST_LEVEL && rush_i < MEGA_ID) {
                 rush_i++;
                 phase = PH_RUSHGAP;
                 phase_t = 110;
@@ -1412,7 +1531,7 @@ int play_update(void) {
                 phase = PH_CLEAR;
                 phase_t = 0;
                 music(SONG_WIN);
-                if (level == 15) set_banner("YOU WIN!", "THE MEGA ROBOT IS SCRAP!", 400);
+                if (level == LAST_LEVEL) set_banner("YOU WIN!", "THE MEGA ROBOT IS SCRAP!", 400);
                 else {
                     static char line[24];
                     char n[8];
@@ -1431,12 +1550,12 @@ int play_update(void) {
             boss_start(rush_i);
             phase = PH_WARN;
             phase_t = 90;
-            set_banner(rush_i == 14 ? "WARNING!" : "NEXT BOSS", boss_names[rush_i], 110);
+            set_banner(rush_i == MEGA_ID ? "WARNING!" : "NEXT BOSS", boss_names[rush_i], 110);
             sfx(SFX_WARN);
         }
         break;
     case PH_CLEAR:
-        if (++phase_t > 200) return level == 15 ? EV_WIN : EV_CLEAR;
+        if (++phase_t > 200) return level == LAST_LEVEL ? EV_WIN : EV_CLEAR;
         break;
     case PH_DEAD:
         if (++phase_t > 150) return EV_DEAD;
@@ -1450,6 +1569,18 @@ int play_update(void) {
         if (!shake_t) shake_m = 0;
     } else {
         shake_x = shake_y = 0;
+    }
+    weather_update(cam - bg_x[1]);
+    // a full XP bar: pause for a level-up pick
+    if (xp >= xp_need() && R.st == RS_FREE && (phase == PH_WALK || phase == PH_BOSS || phase == PH_WARN) &&
+        !(B.on && B.st == BS_DIE) && (B.on || phase == PH_WALK)) {
+        xp -= xp_need();
+        plv++;
+        pick_upgrades();
+        lvl_sel = 0;
+        lvlup = 1;
+        levelup_screen();
+        sfx(SFX_PICKUP);
     }
     bg_x[1] = cam;
     bg_x[2] = cam >> 1;

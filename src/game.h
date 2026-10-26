@@ -35,11 +35,23 @@ extern u16 grad[160];
 extern volatile int grad_on;
 extern volatile u32 vblanks;
 
-enum { U_HAND, U_EYE, U_STOMP, U_SLAM, U_ARMOR, U_THUNDER, U_SPEED, U_COUNT };
+#define LAST_LEVEL 21       // the final level: every boss again, then the Mega Robot
+#define MEGA_ID BOSS_COUNT  // boss index of the Mega Robot
+
+enum { U_HAND, U_EYE, U_STOMP, U_SLAM, U_ARMOR, U_THUNDER, U_SPEED, U_POWER, U_COUNT };
+#define U_REPAIR U_COUNT    // offered when fewer than three upgrades are left
 extern u8 up_lv[U_COUNT];
-extern int level;          // 1..15
+extern int level;          // 1..LAST_LEVEL
 extern u32 squished;
+extern int plv, xp;        // player level and experience toward the next one
+int xp_need(void);
 void save_game(void);
+
+// upgrade picker (shared by the between-levels screen and the level-up popup)
+extern int up_choice[3], up_count;
+void pick_upgrades(void);
+void draw_upgrade_choices(int y0, int sel, int panel);
+int take_upgrade(int sel);
 
 enum { SC_TITLE, SC_HOWTO, SC_CARD, SC_PLAY, SC_UPGRADE, SC_LAVA, SC_GAMEOVER, SC_WIN, SC_DEV };
 void goto_scene(int s);

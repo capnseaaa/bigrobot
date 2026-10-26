@@ -815,6 +815,70 @@ def warn():
     return cv
 
 
+def rain():
+    cv = Canvas(8, 8)
+    cv.line(5, 0, 2, 7, 7)
+    cv.px(4, 2, 11)
+    return cv
+
+
+def snow():
+    cv = Canvas(8, 8)
+    cv.line(3.5, 1, 3.5, 6, 11)
+    cv.line(1, 3.5, 6, 3.5, 11)
+    cv.px(2, 2, 7)
+    cv.px(5, 5, 7)
+    cv.px(5, 2, 7)
+    cv.px(2, 5, 7)
+    return cv
+
+
+def ember():
+    cv = Canvas(8, 8)
+    cv.ellipse(3.5, 3.5, 1.2, 1.2, 9)
+    cv.px(3, 3, 10)
+    return cv
+
+
+def speck():
+    cv = Canvas(8, 8)
+    cv.px(3, 4, 13)
+    cv.px(4, 4, 13)
+    cv.px(6, 3, 12)
+    return cv
+
+
+def puff(f):
+    cv = Canvas(16, 16)
+    r = 2.5 + f * 1.6
+    for ox in (-3, 0, 3):
+        cv.ellipse(7.5 + ox * (1 + f * 0.5), 12 - f, r * (0.8 if ox else 1), r * 0.7, 13 if f < 2 else 12)
+    if f < 2:
+        cv.ellipse(7, 11 - f, r * 0.5, r * 0.35, 11)
+    return cv
+
+
+def mflash(v):
+    cv = Canvas(16, 16)
+    r = 4.5 if v == 0 else 6
+    cv.ellipse(7.5, 7.5, r, r * 0.8, 5)
+    cv.ellipse(7.5, 7.5, r - 1.5, r * 0.8 - 1.5, 6)
+    cv.ellipse(7.5, 7.5, r - 3, r * 0.8 - 3, 7)
+    for a in range(0, 360, 60):
+        cv.line(7.5, 7.5, 7.5 + math.cos(math.radians(a + v * 30)) * 7.5, 7.5 + math.sin(math.radians(a + v * 30)) * 6, 7)
+    return cv
+
+
+def shadow(w):
+    """Dithered dark oval (no hardware transparency needed)."""
+    cv = Canvas(w, 8)
+    for y in range(8):
+        for x in range(w):
+            if ((x - w / 2 + 0.5) / (w / 2)) ** 2 + ((y - 3.5) / 3.6) ** 2 <= 1 and (x + y) % 2 == 0:
+                cv.p[y][x] = 1
+    return cv
+
+
 def build_fx():
     fx_add("bolt", 16, 16, [bolt(0), bolt(22.5), bolt(45), bolt(67.5), bolt(90)])
     fx_add("beam", 16, 16, [beam_seg(0), beam_seg(1)])
@@ -828,6 +892,11 @@ def build_fx():
     fx_add("dust", 32, 16, [wave(0), wave(1)])
     fx_add("spark", 16, 16, [spark(0), spark(1)])
     fx_add("warn", 8, 8, [warn()])
+    fx_add("weather", 8, 8, [rain(), snow(), ember(), speck()])
+    fx_add("puff", 16, 16, [puff(f) for f in range(3)])
+    fx_add("mflash", 16, 16, [mflash(0), mflash(1)])
+    fx_add("shadow32", 32, 8, [shadow(32)])
+    fx_add("shadow16", 16, 8, [shadow(16)])
     words = []
     off = 0
     for name, w, h, cvs in FX:
@@ -1010,6 +1079,31 @@ def sound(v):
     return cv
 
 
+def shuriken(v):
+    cv = Canvas(16, 16)
+    m = Canvas(16, 16)
+    pts = []
+    for i in range(8):
+        a = math.radians(i * 45 + v * 22.5)
+        r = 7 if i % 2 == 0 else 2.2
+        pts.append((7.5 + math.cos(a) * r, 7.5 + math.sin(a) * r))
+    m.poly(pts, 1)
+    cv.paste(shade(m, (2, 3, 4, 4)))
+    cv.px(7, 7, 1)
+    cv.px(8, 8, 1)
+    return cv
+
+
+def laser(angle):
+    cv = Canvas(16, 16)
+    a = math.radians(angle)
+    dx, dy = math.cos(a), math.sin(a)
+    cv.capsule(7.5 - dx * 7, 7.5 - dy * 7, 7.5 + dx * 7, 7.5 + dy * 7, 2.2, 5)
+    cv.capsule(7.5 - dx * 6, 7.5 - dy * 6, 7.5 + dx * 6, 7.5 + dy * 6, 1.1, 7)
+    cv.capsule(7.5 - dx * 5, 7.5 - dy * 5, 7.5 + dx * 5, 7.5 + dy * 5, 0.3, 10)
+    return cv
+
+
 def build_proj():
     PROJ.append(("rivet", [ball(2, 3, 4, 4)]))
     PROJ.append(("saw", [saw(0), saw(1)]))
@@ -1023,6 +1117,8 @@ def build_proj():
     PROJ.append(("rock", [rock()]))
     PROJ.append(("scythe", [scythe(0), scythe(1)]))
     PROJ.append(("sound", [sound(0), sound(1)]))
+    PROJ.append(("shuriken", [shuriken(0), shuriken(1)]))
+    PROJ.append(("laser", [laser(0), laser(22.5), laser(45), laser(67.5), laser(90)]))
     words = []
     off = 0
     starts, counts = [], []
@@ -1080,6 +1176,18 @@ BOSSES = [
          legs="biped", extras=["mohawk", "flames"]),
     dict(name="STEEL TITAN", p="#5a7ca0", s="#e0b030", eye="#40c0ff", body="knight", head="helm", arm="sword",
          legs="heavy", extras=["shield"]),
+    dict(name="BLIZZARD BEAST", p="#dce6f0", s="#5a94d0", eye="#40e0ff", body="barrel", head="yeti", arm="fist",
+         legs="heavy", extras=["spikes"]),
+    dict(name="NEON NINJA", p="#202034", s="#ff30c0", eye="#40ffff", body="slim", head="ninja", arm="sword",
+         legs="biped", extras=[]),
+    dict(name="SCRAP KING", p="#8a6a3a", s="#e0c030", eye="#ff4020", body="tank", head="box", arm="claw",
+         legs="treads", extras=["crown", "stripes"]),
+    dict(name="CYCLOPS", p="#4a5a6a", s="#ff3030", eye="#ff2020", body="brute", head="cyclops", arm="cannon",
+         legs="biped", extras=["coils"]),
+    dict(name="DRAGON-X", p="#2a7a3a", s="#e0b030", eye="#ffb020", body="slim", head="dragon", arm="flamer",
+         legs="bird", extras=[]),
+    dict(name="INFERNO KING", p="#3a0c0c", s="#ff6010", eye="#ffe040", body="brute", head="horns", arm="hammer",
+         legs="heavy", extras=["crown", "flames", "cracks"]),
 ]
 MEGA = dict(name="MEGA ROBOT", p="#b01420", s="#1e1e24", eye="#ff2020", body="brute", head="horns", arm="cannon",
             legs="heavy", extras=["spikes", "pods", "reactor"])
@@ -1257,6 +1365,13 @@ def boss_draw(b, pose, w=64, h=96, k=1.0):
             tip = (hx + nx * 30, hy + ny * 30)
             d.cap((9, 10, 11, 14), base, tip, 2)
             d.ln((hx - ny * 6, hy + nx * 6), (hx + ny * 6, hy - nx * 6), 6, 2)
+            d.ell(BS, (hx, hy), 4, 4)
+        elif kind == "hammer":
+            top = (hx + ux * 2, hy - 18) if not atk else (hx + 16, hy - 10)
+            d.ln((hx, hy), top, 9, 2)
+            hx2, hy2 = top
+            d.pol(BS, [(hx2 - 9, hy2 - 6), (hx2 + 9, hy2 - 6), (hx2 + 9, hy2 + 5), (hx2 - 9, hy2 + 5)])
+            d.ln((hx2 - 9, hy2 - 1), (hx2 + 9, hy2 - 1), 13)
             d.ell(BS, (hx, hy), 4, 4)
         elif kind == "shield":
             d.pol(BS, [(hx - 9, hy - 12), (hx + 7, hy - 12), (hx + 7, hy + 2), (hx - 1, hy + 12), (hx - 9, hy + 2)])
@@ -1444,6 +1559,55 @@ def boss_draw(b, pose, w=64, h=96, k=1.0):
         d.box((15, 15, 15, 15), hx - 1, hy - 1, hx + 1, hy + 6)
         d.ln((hx - 6, hy - 2), (hx + 6, hy - 2), 12 if not atk else 13)
         d.pol(BS, [(hx - 2, hy - 11), (hx + 2, hy - 11), (hx + 1, hy - 19), (hx - 6, hy - 20)])
+    elif head == "yeti":
+        d.ell(BP, (hx, hy), 11, 10)
+        for i in range(7):
+            a = math.radians(200 + i * 23)
+            d.fpoly([(hx + math.cos(a) * 9, hy + math.sin(a) * 8), (hx + math.cos(a + 0.2) * 13, hy + math.sin(a + 0.2) * 12),
+                     (hx + math.cos(a + 0.35) * 9, hy + math.sin(a + 0.35) * 8)], 4)
+        d.box((15, 15, 15, 15), hx - 6, hy - 3, hx + 7, hy)
+        d.dot(hx - 3, hy - 2, 12 if not atk else 13, 1.2)
+        d.dot(hx + 4, hy - 2, 12 if not atk else 13, 1.2)
+        jo = 3 if atk else 0
+        d.box((15, 15, 15, 15), hx - 5, hy + 3, hx + 6, hy + 5 + jo)
+        d.fpoly([(hx - 4, hy + 3), (hx - 2, hy + 3), (hx - 3, hy + 7 + jo)], 14)
+        d.fpoly([(hx + 3, hy + 3), (hx + 5, hy + 3), (hx + 4, hy + 7 + jo)], 14)
+    elif head == "ninja":
+        d.ell(BP, (hx, hy), 9, 9)
+        d.box(BS, hx - 9, hy - 4, hx + 9, hy - 1)
+        d.pol(BS, [(hx - 9, hy - 3), (hx - 19, hy - 7 + pose), (hx - 18, hy - 2 + pose), (hx - 9, hy)])
+        d.box((15, 15, 15, 15), hx - 6, hy + 1, hx + 8, hy + 3)
+        d.ln((hx - 3, hy + 2), (hx + 7, hy + 2), 12 if not atk else 13)
+    elif head == "cyclops":
+        d.ell(BP, (hx, hy), 11, 10)
+        d.dot(hx + 1, hy - 1, 15, 6)
+        d.dot(hx + 1, hy - 1, 12, 4.5)
+        d.dot(hx + 2, hy - 1, 13, 2.5 if not atk else 3.5)
+        d.dot(hx + 3, hy - 3, 14)
+        d.ln((hx - 6, hy + 7), (hx + 7, hy + 7), 15)
+        d.pol(BS, [(hx - 2, hy - 10), (hx + 2, hy - 10), (hx, hy - 17)])
+    elif head == "dragon":
+        for sg in (-1, 1):
+            d.pol(BS, [(hx - 4 + sg * 2, hy - 7), (hx - 12 + sg * 3, hy - 18), (hx - 2 + sg * 2, hy - 9)])
+        d.pol(BP, [(hx - 9, hy - 8), (hx + 4, hy - 9), (hx + 18, hy - 2), (hx + 18, hy + 2), (hx + 4, hy + 2),
+                   (hx - 9, hy + 6)])
+        jo = 5 if atk else 1
+        d.pol(BPD, [(hx - 6, hy + 2), (hx + 16, hy + 2 + jo), (hx + 14, hy + 5 + jo), (hx - 6, hy + 8)])
+        for i in range(4):
+            x = hx + 4 + i * 3.5
+            d.fpoly([(x, hy + 2), (x + 2, hy + 2), (x + 1, hy + 4)], 14)
+        d.dot(hx + 1, hy - 4, 12 if not atk else 13, 1.5)
+        d.dot(hx + 16, hy - 1, 15)
+        if atk:
+            d.dot(hx + 20, hy + 3, 12, 2.5)
+            d.dot(hx + 23, hy + 3, 13, 1.5)
+    if "crown" in ex:
+        cy = hy - (9 if head != "horns" else 8)
+        d.pol((6, 7, 8, 8), [(hx - 9, cy + 2), (hx - 9, cy - 6), (hx - 5, cy - 2), (hx, cy - 8), (hx + 5, cy - 2),
+                             (hx + 9, cy - 6), (hx + 9, cy + 2)])
+        d.dot(hx, cy - 1, 13)
+        d.dot(hx - 6, cy, 12)
+        d.dot(hx + 6, cy, 12)
     if "mohawk" in ex and head != "skull":
         for i in range(5):
             x = hx - 6 + i * 3
@@ -1490,7 +1654,7 @@ def build_bosses():
     words = []
     pals = []
     sheet = Canvas(64 * 14, 96 * 3)
-    img = Image.new("RGB", (64 * 14, 96 * 3))
+    img = Image.new("RGB", (64 * len(BOSSES), 96 * 3))
     for i, b in enumerate(BOSSES):
         pal = boss_pal(b)
         pals.extend(g15(c) for c in pal)
@@ -1591,9 +1755,14 @@ FONT_PAL = [(0, 0, 0), H("#000000"), H("#ffffff"), H("#c8ced8"), H("#8e98a8"), H
 SMALL_ROWS = [2, 3, 4, 5, 6, 7, 7]
 
 
-def glyph_small(ch, style):
-    cv = Canvas(8, 8)
+PANEL_CHARS = " !%'()+,-./0123456789:>?ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def glyph_small(ch, style, panel=False):
+    cv = Canvas(8, 8, 13 if panel else 0)
     g = FONT5.get(ch)
+    if ch == "%":
+        g = ["##  #", "## # ", "   # ", "  #  ", " #   ", "# ## ", "#  ##"]
     if not g:
         return cv
     m = Canvas(8, 8)
@@ -1660,6 +1829,18 @@ def build_fonts():
                 words.extend(pack4(t))
             n += 1
     define("FONT_SMALL_COUNT", len(FONT_CHARS))
+    # the same letters on the dark panel color, for popups drawn over the game
+    define("FONT_PANEL_BASE", n)
+    define("FONT_PANEL_COUNT", len(PANEL_CHARS))
+    pmap = [0] * 64
+    for i, ch in enumerate(PANEL_CHARS):
+        pmap[ord(ch) - 32] = i
+    emit_s8("panel_map", pmap)
+    for style in range(2):
+        for ch in PANEL_CHARS:
+            for t in tiles4(glyph_small(ch, style, True)):
+                words.extend(pack4(t))
+            n += 1
     define("FONT_BIG_BASE", n)
     bmap = [0] * 64
     for i, ch in enumerate(BIG_CHARS):
@@ -1672,7 +1853,7 @@ def build_fonts():
         n += 4
     # HUD tiles: bars (9 fill levels) in three colors, icons
     define("HUD_BASE", n)
-    bar_cols = [(10, 14), (11, 6), (15, 13)]
+    bar_cols = [(10, 14), (11, 6), (15, 13), (12, 13)]
     for c, cd in bar_cols:
         for f in range(9):
             cv = Canvas(8, 8)
@@ -1742,14 +1923,15 @@ def build_fonts():
     define("HUD_BAR_HP", "(HUD_BASE + 0)")
     define("HUD_BAR_EYE", "(HUD_BASE + 9)")
     define("HUD_BAR_BOSS", "(HUD_BASE + 18)")
-    define("HUD_BOLT", "(HUD_BASE + 27)")
-    define("HUD_BOLT_EMPTY", "(HUD_BASE + 28)")
-    define("HUD_EYE", "(HUD_BASE + 29)")
-    define("HUD_HEART", "(HUD_BASE + 30)")
-    define("HUD_SKULL", "(HUD_BASE + 31)")
-    define("HUD_PANEL", "(HUD_BASE + 32)")
-    define("HUD_PANEL_TOP", "(HUD_BASE + 33)")
-    define("HUD_PANEL_BOT", "(HUD_BASE + 34)")
+    define("HUD_BAR_XP", "(HUD_BASE + 27)")
+    define("HUD_BOLT", "(HUD_BASE + 36)")
+    define("HUD_BOLT_EMPTY", "(HUD_BASE + 37)")
+    define("HUD_EYE", "(HUD_BASE + 38)")
+    define("HUD_HEART", "(HUD_BASE + 39)")
+    define("HUD_SKULL", "(HUD_BASE + 40)")
+    define("HUD_PANEL", "(HUD_BASE + 41)")
+    define("HUD_PANEL_TOP", "(HUD_BASE + 42)")
+    define("HUD_PANEL_BOT", "(HUD_BASE + 43)")
     define("FONT_TILES", n)
     emit_u32("font_tiles", words)
     emit_pal("font_pal", FONT_PAL)
@@ -1928,6 +2110,18 @@ THEMES = [
               "#d0ff60", "#ffe020", "#304034"],
          near=["#060a08", "#222a24", "#343e36", "#e0d020", "#2c362e", "#46524a", "#64746a", "#1c241e", "#2e3a30",
                "#46564a", "#26302a", "#e0ff90"]),
+    dict(name="ICE AGE", sky=["#0a1830", "#24508a", "#7ab0e0", "#d8f0ff"],
+         far=["#4a6a98", "#7090c0", "#e8f4ff", "#ffffff"],
+         mid=["#0a1424", "#24406a", "#36588a", "#9ac4f0", "#1a2c48", "#80e8ff", "#e8ffff", "#40a0ff", "#80d0ff",
+              "#e0f8ff", "#ff4040", "#c0d8f0"],
+         near=["#101c2c", "#8aa4c4", "#c8dcf0", "#ffffff", "#5a7898", "#b8d0e8", "#f0f8ff", "#6a88a8", "#a0bcd8",
+               "#e8f4ff", "#405870", "#fff4c0"]),
+    dict(name="NEON NIGHTS", sky=["#08001a", "#2a0050", "#7a0090", "#ff3aa0"],
+         far=["#1a0030", "#2a0048", "#5a1080", "#ff40c0"],
+         mid=["#06000e", "#1a0a2e", "#2a1444", "#ff40c0", "#140820", "#40f0ff", "#ffffff", "#ff2080", "#ff60e0",
+              "#ffe0ff", "#40ff80", "#3a2050"],
+         near=["#06000c", "#1a1028", "#2c1c40", "#40f0ff", "#2a1440", "#ff40c0", "#ff90e0", "#201030", "#3a2050",
+               "#5a3070", "#30204a", "#80ffff"]),
     dict(name="HELLFIRE", sky=["#000000", "#200000", "#600808", "#c02010"],
          far=["#100000", "#200404", "#3a0a0a", "#ff3010"],
          mid=["#000000", "#140808", "#221010", "#341a1a", "#100606", "#ff3010", "#ffb060", "#ff2000", "#ff7000",

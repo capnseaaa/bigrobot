@@ -13,10 +13,10 @@
 40 0 f_card.ppm
 1 1
 1 0
-10 0 !$rush_i=14
+10 0 !$rush_i=20
 150 0 f_mega.ppm
 120 2 f_mega2.ppm
-1 0 !$B+44=2
+1 0 !$B+44=1
 80 2 f_megadie.ppm
 200 0 f_clear.ppm
 120 0 f_win.ppm

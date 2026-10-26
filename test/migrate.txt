@@ -1,0 +1,9 @@
+# load a save written by v0.1.5 (level 4, all old upgrades maxed): CONTINUE must show LV 4 and keep the upgrades
+60 0
+1 8
+1 0
+20 0 m_title.ppm
+1 1
+1 0
+40 0 m_card.ppm
+1 0 @$level,$up_lv,$up_lv+4,$plv

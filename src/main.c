@@ -10,6 +10,8 @@ int bg_x[4];
 u8 up_lv[U_COUNT];
 int level = 1;
 u32 squished;
+int plv, xp;
+static int dev_run;               // started from level select: do not overwrite the save
 
 static u16 oam_buf[512];
 static int oam_n;
@@ -119,8 +121,13 @@ static int up_char(int c) {
     return c;
 }
 
+// styles: 0 chrome/fire, 1 white, 2 chrome/fire on a dark panel, 3 white on a dark panel
 void txt(int x, int y, const char* s, int style) {
-    for (; *s; s++, x++) put_tile(x, y, style * 64 + (up_char(*s) - 32));
+    for (; *s; s++, x++) {
+        int c = up_char(*s) - 32;
+        if (style >= 2) put_tile(x, y, FONT_PANEL_BASE + (style - 2) * FONT_PANEL_COUNT + panel_map[c]);
+        else put_tile(x, y, style * 64 + c);
+    }
 }
 
 static int slen(const char* s) {
@@ -225,12 +232,12 @@ static void video_screen(int which) {
     else if (which == SCR_LAVA) { tiles = lava_tiles; map = lava_map; pal = lava_pal; nt = sizeof(lava_tiles); }
     else { tiles = win_tiles; map = win_map; pal = win_pal; nt = sizeof(win_tiles); }
     dma32((void*)CHARBLOCK(0), tiles, nt / 4);
-    fill32((void*)SCREENBLOCK(30), 0, 512);
-    dma32((void*)SCREENBLOCK(30), map, 32 * 20 / 2);
+    fill32((void*)SCREENBLOCK(18), 0, 512);
+    dma32((void*)SCREENBLOCK(18), map, 32 * 20 / 2);
     for (int i = 0; i < 224; i++) BG_PAL[i] = pal[i];
     txt_clear();
     REG_BGCNT(0) = 0x1F0C;
-    REG_BGCNT(2) = 0x1E81;
+    REG_BGCNT(2) = 0x1281;   // 8bpp, char block 0, screen block 18 (right after the tiles)
     REG_BGHOFS(2) = 0;
     REG_BGVOFS(2) = 0;
     REG_DISPCNT = 0x0040 | 0x0100 | 0x0400 | 0x1000;
@@ -273,7 +280,8 @@ static void load_static(void) {
 
 // ---------------------------------------------------------------- saving (SRAM)
 
-#define SAVE_MAGIC 0x31524742u   // "BGR1"
+#define SAVE_MAGIC_V1 0x31524742u   // "BGR1" (v0.1.x: level, 7 upgrades, squished)
+#define SAVE_MAGIC 0x32524742u      // "BGR2" (adds the Power upgrade, player level and XP)
 
 static void sram_write(int off, const u8* src, int n) {
     for (int i = 0; i < n; i++) SRAM[off + i] = src[i];
@@ -283,56 +291,87 @@ static void sram_read(int off, u8* dst, int n) {
     for (int i = 0; i < n; i++) dst[i] = SRAM[off + i];
 }
 
+// v2 layout: magic(4) level(1) upgrades(8) plv(1) xp(2) squished(4)
 void save_game(void) {
-    u8 b[16];
+    if (dev_run) return;
+    u8 b[20];
     u32 m = SAVE_MAGIC;
     for (int i = 0; i < 4; i++) b[i] = m >> (8 * i);
     b[4] = level;
-    for (int i = 0; i < U_COUNT; i++) b[5 + i] = up_lv[i];
-    for (int i = 0; i < 4; i++) b[12 + i] = squished >> (8 * i);
-    sram_write(0, b, 16);
+    for (int i = 0; i < 8; i++) b[5 + i] = i < U_COUNT ? up_lv[i] : 0;
+    b[13] = plv;
+    b[14] = xp;
+    b[15] = xp >> 8;
+    for (int i = 0; i < 4; i++) b[16 + i] = squished >> (8 * i);
+    sram_write(0, b, 20);
     save_level = level;
 }
 
+static u32 save_magic(const u8* b) { return b[0] | (b[1] << 8) | (b[2] << 16) | ((u32)b[3] << 24); }
+
 static void load_save(void) {
-    u8 b[16];
-    sram_read(0, b, 16);
-    u32 m = b[0] | (b[1] << 8) | (b[2] << 16) | ((u32)b[3] << 24);
-    save_level = (m == SAVE_MAGIC && b[4] >= 1 && b[4] <= 15) ? b[4] : 0;
+    u8 b[20];
+    sram_read(0, b, 20);
+    u32 m = save_magic(b);
+    save_level = ((m == SAVE_MAGIC || m == SAVE_MAGIC_V1) && b[4] >= 1 && b[4] <= LAST_LEVEL) ? b[4] : 0;
 }
 
+static const u8 up_max[U_COUNT] = { 3, 3, 3, 3, 6, 3, 2, 5 };
+
 static void continue_game(void) {
-    u8 b[16];
-    sram_read(0, b, 16);
+    u8 b[20];
+    sram_read(0, b, 20);
     level = b[4];
-    for (int i = 0; i < U_COUNT; i++) up_lv[i] = b[5 + i] > 3 ? 3 : b[5 + i];
-    squished = b[12] | (b[13] << 8) | (b[14] << 16) | ((u32)b[15] << 24);
+    if (save_magic(b) == SAVE_MAGIC_V1) {
+        // old save: 7 upgrades, then squished at byte 12; no Power, player level or XP yet
+        for (int i = 0; i < U_COUNT; i++) up_lv[i] = i < 7 ? b[5 + i] : 0;
+        squished = b[12] | (b[13] << 8) | (b[14] << 16) | ((u32)b[15] << 24);
+        plv = xp = 0;
+    } else {
+        for (int i = 0; i < U_COUNT; i++) up_lv[i] = b[5 + i];
+        plv = b[13];
+        xp = b[14] | (b[15] << 8);
+        squished = b[16] | (b[17] << 8) | (b[18] << 16) | ((u32)b[19] << 24);
+    }
+    for (int i = 0; i < U_COUNT; i++)
+        if (up_lv[i] > up_max[i]) up_lv[i] = up_max[i];
 }
 
 static void new_game(void) {
     level = 1;
     for (int i = 0; i < U_COUNT; i++) up_lv[i] = 0;
     squished = 0;
+    plv = xp = 0;
+    dev_run = 0;
 }
+
+int xp_need(void) { return 6 + plv * 3; }
 
 // ---------------------------------------------------------------- upgrades
 
-static const char* const up_name[U_COUNT] = { "HAND LASERS", "EYE LASERS", "STOMP", "SLAM", "ARMOR",
-                                              "THUNDERCLAP", "SPEED" };
-static const u8 up_max[U_COUNT] = { 3, 3, 3, 3, 3, 3, 2 };
-static const char* const up_desc[U_COUNT][3] = {
+static const char* const up_name[U_COUNT + 1] = { "HAND LASERS", "EYE LASERS", "STOMP", "SLAM", "ARMOR",
+                                                  "THUNDERCLAP", "SPEED", "POWER", "REPAIR" };
+static const char* const up_desc3[4][3] = {
     { "TWO SHOTS AT ONCE", "FASTER SHOTS", "THREE SHOTS AT ONCE" },
     { "STRONGER BEAM", "COOLS DOWN FASTER", "MEGA BEAM" },
     { "WIDER STOMP", "STOMP SHOCKWAVE", "MEGA STOMP" },
     { "BIGGER SLAM", "FASTER SLAM", "MEGA SLAM" },
-    { "+5 MAX HEALTH", "+5 MAX HEALTH", "+5 MAX HEALTH" },
-    { "+1 CLAP EVERY LEVEL", "+1 CLAP EVERY LEVEL", "+1 CLAP EVERY LEVEL" },
-    { "WALK FASTER", "WALK EVEN FASTER", "" },
 };
-static const char* const roman[4] = { "", " I", " II", " III" };
-static int up_choice[3], up_count;
+static const char* const roman[7] = { "", " I", " II", " III", " IV", " V", " VI" };
+int up_choice[3], up_count;
 
-static void pick_upgrades(void) {
+static const char* up_desc(int u) {
+    if (u < 4) return up_desc3[u][up_lv[u]];
+    switch (u) {
+    case U_ARMOR: return "+5 MAX HEALTH";
+    case U_THUNDER: return "+1 CLAP EVERY LEVEL";
+    case U_SPEED: return up_lv[u] ? "WALK EVEN FASTER" : "WALK FASTER";
+    case U_POWER: return "+25% DAMAGE TO BOSSES";
+    default: return "FULL HEALTH NOW";
+    }
+}
+
+void pick_upgrades(void) {
     int avail[U_COUNT], n = 0;
     for (int i = 0; i < U_COUNT; i++)
         if (up_lv[i] < up_max[i]) avail[n++] = i;
@@ -342,22 +381,38 @@ static void pick_upgrades(void) {
         up_choice[up_count++] = avail[k];
         avail[k] = avail[--n];
     }
+    if (up_count < 3) up_choice[up_count++] = U_REPAIR;
+}
+
+void draw_upgrade_choices(int y0, int sel, int panel) {
+    int p2 = panel ? 2 : 0;
+    for (int i = 0; i < up_count; i++) {
+        int u = up_choice[i];
+        int y = y0 + i * 4;
+        char name[24];
+        int p = 0;
+        for (const char* s = up_name[u]; *s; s++) name[p++] = *s;
+        if (u != U_REPAIR)
+            for (const char* s = roman[up_lv[u] + 1]; *s; s++) name[p++] = *s;
+        name[p] = 0;
+        txt(3, y, i == sel ? ">" : " ", p2);
+        txt(5, y, "                     ", 1 + p2);
+        txt(5, y, name, (i == sel ? 0 : 1) + p2);
+        txt(6, y + 2, "                    ", 1 + p2);
+        txt(6, y + 2, up_desc(u), 1 + p2);
+    }
+}
+
+// apply choice sel; returns which upgrade it was (U_REPAIR for a repair)
+int take_upgrade(int sel) {
+    int u = up_choice[sel];
+    if (u != U_REPAIR) up_lv[u]++;
+    return u;
 }
 
 static void draw_upgrades(void) {
     txt_clear_rows(5, 19);
-    for (int i = 0; i < up_count; i++) {
-        int u = up_choice[i];
-        int y = 5 + i * 4;
-        char name[24];
-        int p = 0;
-        for (const char* s = up_name[u]; *s; s++) name[p++] = *s;
-        for (const char* s = roman[up_lv[u] + 1]; *s; s++) name[p++] = *s;
-        name[p] = 0;
-        if (i == st_sel) txt(2, y, ">", 0);
-        txt(4, y, name, i == st_sel ? 0 : 1);
-        txt(6, y + 2, up_desc[u][up_lv[u]], 1);
-    }
+    draw_upgrade_choices(5, st_sel, 0);
     txt_center(19, "UP/DOWN PICK   A TAKE IT", 1);
 }
 
@@ -405,13 +460,13 @@ void goto_scene(int s) {
         save_game();
         char b[16] = "LEVEL ";
         num_str(b + 6, level);
-        if (level == 15) {
+        if (level == LAST_LEVEL) {
             txt_big_center(6, "FINAL LEVEL");
-            txt_center(10, "ALL 14 BOSSES ARE BACK", 1);
+            txt_center(10, "ALL 20 BOSSES ARE BACK", 1);
             txt_center(12, "THEN THE MEGA ROBOT!", 0);
         } else {
             txt_big_center(6, b);
-            txt_center(10, theme_names[(level - 1) / 3], 0);
+            txt_center(10, theme_names[(level - 1) / 3 < THEME_COUNT ? (level - 1) / 3 : THEME_COUNT - 1], 0);
         }
         break;
     }
@@ -497,14 +552,10 @@ static void scene_update(void) {
         break;
     }
     case SC_UPGRADE:
-        if (up_count == 0) {
-            if (st_t > 30) { level++; goto_scene(SC_CARD); }
-            break;
-        }
         if (pressed & KEY_UP) { st_sel = (st_sel + up_count - 1) % up_count; sfx(SFX_SELECT); draw_upgrades(); }
         if (pressed & KEY_DOWN) { st_sel = (st_sel + 1) % up_count; sfx(SFX_SELECT); draw_upgrades(); }
         if (st_t > 20 && (pressed & KEY_A)) {
-            up_lv[up_choice[st_sel]]++;
+            take_upgrade(st_sel);
             sfx(SFX_PICKUP);
             level++;
             goto_scene(SC_CARD);
@@ -519,10 +570,19 @@ static void scene_update(void) {
             for (int i = 0; i < 11; i++) BG_PAL[b + i] = BG_PAL[b + i + 1];
             BG_PAL[b + 11] = first;
         }
-        txt_clear_rows(18, 18);
-        if (st_t > 60 && ((st_t >> 5) & 1)) txt_center(18, "PRESS A FOR A NEW GAME", 0);
-        if (st_t > 60 && (pressed & (KEY_A | KEY_START))) {
-            new_game();
+        if (st_t == 61 || (st_t > 61 && (pressed & (KEY_UP | KEY_DOWN)))) {
+            if (st_t > 61) { st_sel ^= 1; sfx(SFX_SELECT); }
+            for (int y = 15; y <= 19; y++)
+                for (int x = 3; x <= 26; x++) put_tile(x, y, y == 15 ? HUD_PANEL_TOP : y == 19 ? HUD_PANEL_BOT : HUD_PANEL);
+            txt(5, 16, st_sel == 0 ? ">" : " ", 2);
+            txt(7, 16, "KEEP UPGRADES, LEVEL 1", st_sel == 0 ? 2 : 3);
+            txt(5, 18, st_sel == 1 ? ">" : " ", 2);
+            txt(7, 18, "START OVER", st_sel == 1 ? 2 : 3);
+        }
+        if (st_t > 61 && (pressed & (KEY_A | KEY_START))) {
+            if (st_sel == 1) new_game();
+            else level = 1;
+            sfx(SFX_SELECT);
             goto_scene(SC_CARD);
         }
         break;
@@ -537,8 +597,8 @@ static void scene_update(void) {
         if (st_t > 90 && (pressed & KEY_START)) goto_scene(SC_TITLE);
         break;
     case SC_DEV: {
-        if (pressed & KEY_UP) st_sel = st_sel % 15 + 1;
-        if (pressed & KEY_DOWN) st_sel = (st_sel + 13) % 15 + 1;
+        if (pressed & KEY_UP) st_sel = st_sel % LAST_LEVEL + 1;
+        if (pressed & KEY_DOWN) st_sel = (st_sel + LAST_LEVEL - 2) % LAST_LEVEL + 1;
         if (pressed & KEY_L) dev_max ^= 1;
         char b[16] = "LEVEL ";
         num_str(b + 6, st_sel);
@@ -549,6 +609,7 @@ static void scene_update(void) {
         if (pressed & KEY_A) {
             new_game();
             level = st_sel;
+            dev_run = 1;
             if (dev_max)
                 for (int i = 0; i < U_COUNT; i++) up_lv[i] = up_max[i];
             goto_scene(SC_CARD);
