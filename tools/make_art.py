@@ -367,27 +367,37 @@ def r_arm(cv, sh, hand, ramp, palm):
 
 
 def r_torso(cv, ln, dy):
+    """Chest twists with the walk: the V plate slides further than the shoulders and the belly turns the
+    other way, so the chest piece visibly moves each step."""
     o = lambda pts: [(x + ln, y + dy) for x, y in pts]
+    tw = ln * 0.9                       # extra twist of the chest plate
     part(cv, DARK, lambda m: m.rect(27 + ln, 23 + dy, 35 + ln, 31 + dy, 1))
-    part(cv, (2, 3, 4, 5), lambda m: m.rect(20 + ln * 0.5, 53 + dy, 42 + ln * 0.5, 62 + dy, 1))
-    part(cv, (2, 3, 4, 4), lambda m: m.rect(23 + ln * 0.7, 48 + dy, 39 + ln * 0.7, 57 + dy, 1))
+    part(cv, (2, 3, 4, 5), lambda m: m.rect(20 + ln * 0.3, 53 + dy, 42 + ln * 0.3, 62 + dy, 1))
+    part(cv, (2, 3, 4, 4), lambda m: m.rect(23 - tw * 0.4, 48 + dy, 39 - tw * 0.4, 57 + dy, 1))
     part(cv, BACK, lambda m: m.ellipse(21 + ln, 32 + dy, 7, 6, 1))
     part(cv, FRONT, lambda m: m.poly(o([(15, 28), (47, 28), (50, 35), (45, 50), (38, 55), (24, 55),
                                          (17, 50), (12, 35)]), 1))
-    # chest: angry red V, bolts, vents
-    cv.line(20 + ln, 33 + dy, 31 + ln, 45 + dy, 14, 2)
-    cv.line(42 + ln, 33 + dy, 31 + ln, 45 + dy, 14, 2)
-    cv.line(20 + ln, 32 + dy, 31 + ln, 44 + dy, 13, 2)
-    cv.line(42 + ln, 32 + dy, 31 + ln, 44 + dy, 13, 2)
-    for bx in (16, 46):
-        cv.px(bx + ln, 33 + dy, 6)
-        cv.px(bx + ln, 34 + dy, 2)
+    # raised chest plate behind the V (turns with the twist)
+    c = 31 + ln + tw
+    lx, rx = 19 + ln + tw * 0.4, 43 + ln + tw * 1.3
+    tip = 45 + dy - abs(tw) * 0.4
+    part(cv, (3, 4, 5, 6), lambda m: m.poly([(lx, 30 + dy), (rx, 30 + dy), (rx - 2, 36 + dy), (c + 1, tip + 4),
+                                            (c - 1, tip + 4), (lx + 2, 36 + dy)], 1), oc=2)
+    # the angry red V
+    cv.line(lx + 1, 33 + dy, c, tip, 14, 2)
+    cv.line(rx - 1, 33 + dy, c, tip, 14, 2)
+    cv.line(lx + 1, 32 + dy, c, tip - 1, 13, 2)
+    cv.line(rx - 1, 32 + dy, c, tip - 1, 13, 2)
+    cv.px(c, tip - 3, 6)
+    for bx in (lx - 2, rx + 2):
+        cv.px(bx, 33 + dy, 6)
+        cv.px(bx, 34 + dy, 2)
     for vy in (48, 50):
-        cv.rect(26 + ln, vy + dy, 36 + ln, vy + dy, 2)
+        cv.rect(26 + ln + tw * 0.5, vy + dy, 36 + ln + tw * 0.5, vy + dy, 2)
     for ry in (51, 54):
-        cv.rect(24 + ln * 0.7, ry + dy, 38 + ln * 0.7, ry + dy, 2)
-    cv.rect(21 + ln * 0.5, 58 + dy, 41 + ln * 0.5, 58 + dy, 1)
-    cv.px(31 + ln * 0.5, 60 + dy, 15)
+        cv.rect(24 - tw * 0.4, ry + dy, 38 - tw * 0.4, ry + dy, 2)
+    cv.rect(21 + ln * 0.3, 58 + dy, 41 + ln * 0.3, 58 + dy, 1)
+    cv.px(31 + ln * 0.3, 60 + dy, 15)
 
 
 def r_head(cv, hx, hy, eyes):
