@@ -1,0 +1,54 @@
+// GBA registers and memory used by the game.
+#pragma once
+#include "types.h"
+
+#define REG16(a) (*(vu16*)(a))
+#define REG32(a) (*(vu32*)(a))
+#define REG_DISPCNT   REG16(0x04000000)
+#define REG_DISPSTAT  REG16(0x04000004)
+#define REG_VCOUNT    REG16(0x04000006)
+#define REG_BGCNT(n)  REG16(0x04000008 + (n) * 2)
+#define REG_BGHOFS(n) REG16(0x04000010 + (n) * 4)
+#define REG_BGVOFS(n) REG16(0x04000012 + (n) * 4)
+#define REG_BLDCNT    REG16(0x04000050)
+#define REG_BLDALPHA  REG16(0x04000052)
+#define REG_BLDY      REG16(0x04000054)
+#define REG_DMA3SAD   REG32(0x040000D4)
+#define REG_DMA3DAD   REG32(0x040000D8)
+#define REG_DMA3CNT   REG32(0x040000DC)
+#define REG_KEYINPUT  REG16(0x04000130)
+#define REG_IE        REG16(0x04000200)
+#define REG_IF        REG16(0x04000202)
+#define REG_WAITCNT   REG16(0x04000204)
+#define REG_IME       REG16(0x04000208)
+#define IRQ_VECTOR    REG32(0x03007FFC)
+#define BIOS_IF       REG16(0x03007FF8)
+
+#define REG_SOUND1CNT_L REG16(0x04000060)
+#define REG_SOUND1CNT_H REG16(0x04000062)
+#define REG_SOUND1CNT_X REG16(0x04000064)
+#define REG_SOUND2CNT_L REG16(0x04000068)
+#define REG_SOUND2CNT_H REG16(0x0400006C)
+#define REG_SOUND3CNT_L REG16(0x04000070)
+#define REG_SOUND3CNT_H REG16(0x04000072)
+#define REG_SOUND3CNT_X REG16(0x04000074)
+#define REG_SOUND4CNT_L REG16(0x04000078)
+#define REG_SOUND4CNT_H REG16(0x0400007C)
+#define REG_SOUNDCNT_L  REG16(0x04000080)
+#define REG_SOUNDCNT_H  REG16(0x04000082)
+#define REG_SOUNDCNT_X  REG16(0x04000084)
+#define WAVE_RAM        ((vu16*)0x04000090)
+
+#define BG_PAL    ((vu16*)0x05000000)
+#define OBJ_PAL   ((vu16*)0x05000200)
+#define OAM       ((vu16*)0x07000000)
+#define VRAM      ((vu16*)0x06000000)
+#define CHARBLOCK(n)  ((vu16*)(0x06000000 + (n) * 0x4000))
+#define SCREENBLOCK(n) ((vu16*)(0x06000000 + (n) * 0x800))
+#define OBJ_TILES ((vu16*)0x06010000)
+#define SRAM      ((volatile u8*)0x0E000000)
+
+#define RGB(r, g, b) ((r) | ((g) << 5) | ((b) << 10))
+
+enum { KEY_A = 1, KEY_B = 2, KEY_SELECT = 4, KEY_START = 8, KEY_RIGHT = 16, KEY_LEFT = 32,
+       KEY_UP = 64, KEY_DOWN = 128, KEY_R = 256, KEY_L = 512 };

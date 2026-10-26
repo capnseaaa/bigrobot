@@ -1,0 +1,17 @@
+# die on level 3 (via level select), then the game over screen
+60 0
+1 772
+1 0
+1 64
+1 0
+1 64
+1 0
+1 1
+1 0
+40 0
+1 1
+1 0
+60 0 d_level3.ppm
+1 0 !$R+20=1
+300 0 d_dying.ppm
+200 0 d_over.ppm

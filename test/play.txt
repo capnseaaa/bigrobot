@@ -1,0 +1,28 @@
+# title -> new game -> how to -> card -> play: walk, shoot, stomp, slam, clap, move up/down
+60 0 t_title.ppm
+1 8
+1 0
+20 0 t_menu.ppm
+1 1
+1 0
+30 0 t_howto.ppm
+1 1
+1 0
+40 0 t_card.ppm
+1 1
+1 0
+60 0 t_go.ppm
+120 0 t_walk.ppm
+30 2 t_shoot.ppm
+60 2
+1 1
+6 0 t_stomp.ppm
+30 0
+40 64 t_up.ppm
+1 512
+12 0 t_slam1.ppm
+30 0 t_slam2.ppm
+1 768
+12 0 t_clap.ppm
+60 128
+200 2 t_later.ppm

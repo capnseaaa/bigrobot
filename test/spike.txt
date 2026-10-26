@@ -1,0 +1,30 @@
+# level 4 via level select: Spike Guy shoots spikes; then power cycle and CONTINUE
+60 0
+1 772
+1 0
+1 64
+1 0
+1 64
+1 0
+1 64
+1 0
+1 1
+1 0
+40 0
+1 1
+1 0
+30 0
+1 0 !$cam=2190
+160 0 s_warn.ppm
+1 0 !$B+48=5
+40 0 s_a.ppm
+30 0 s_b.ppm
+30 0 s_c.ppm
+60 0 s_d.ppm
+60 0 s_e.ppm
+60 0 s_f.ppm
+^
+60 0
+1 8
+1 0
+20 0 s_continue.ppm

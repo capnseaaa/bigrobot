@@ -1,0 +1,28 @@
+# zap a little guy with the eye lasers: the world explodes
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+30 0
+1 1
+1 0
+40 0
+1 1
+1 0
+200 0
+1 256
+16 0 x_1.ppm
+1 0 @$phase,$boom_t
+20 0 x_2.ppm
+40 0 x_3.ppm
+50 0 x_4.ppm
+50 0 x_5.ppm
+40 0 x_6.ppm
+40 0 x_7.ppm
+1 1
+1 0 @$scene,$st_t
+30 0 x_new.ppm
+1 0 @$scene,$st_t
+200 0 x_new2.ppm

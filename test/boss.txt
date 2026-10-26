@@ -1,0 +1,36 @@
+# skip to the boss of level 1, fight it with eye lasers and hand lasers
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+30 0
+1 1
+1 0
+40 0
+1 1
+1 0
+30 0
+1 0 !$cam=1810
+60 0 b_warn.ppm
+100 0 b_enter.ppm
+1 256
+20 0 b_eye1.ppm
+20 0 b_eye2.ppm
+200 2 b_fight.ppm
+1 256
+30 2
+200 2 b_fight2.ppm
+1 256
+30 2
+200 2 b_fight3.ppm
+1 256
+30 2
+200 2 b_fight4.ppm
+1 256
+30 2
+200 2 b_fight5.ppm
+1 0 @$B+0,$B+40,$B+44,$R+20
+200 2 b_end.ppm
+200 0 b_up.ppm
