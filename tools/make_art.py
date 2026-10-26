@@ -461,7 +461,11 @@ def robot_frame(pose):
     cv = Canvas(64, 96)
     hipy = 57 + dy
     fhip, bhip = (35 + ln * 0.5, hipy), (27 + ln * 0.5, hipy)
-    fsh, bsh = (42 + ln, 32 + dy), (21 + ln, 32 + dy)
+    # shoulders follow their arm: they roll back when the arm swings back, forward when it swings forward
+    roll = lambda hx, rest: max(-5, min(4, (hx - rest) * 0.35))
+    fr, br = roll(fh[0], 42), roll(bh[0], 19)
+    fsh = (42 + ln + fr, 32 + dy + abs(fr) * 0.2)
+    bsh = (21 + ln + br, 32 + dy + abs(br) * 0.2)
     r_leg(cv, bhip, bf, BACK)
     r_arm(cv, bsh, bh, BACK, palm)
     r_torso(cv, ln, dy)
