@@ -435,9 +435,9 @@ def r_head(cv, hx, hy, eyes):
 ROBOT_POSES = [
     # name, dy, lean, front ankle, back ankle, front hand, back hand, palm, head dy, eyes
     ("stand", 0, 0, (37, 89), (25, 89), (42, 58), (19, 57), 0, 0, "on"),
-    ("walk1", 2, 4, (49, 89), (13, 89), (30, 58), (33, 58), 0, 0, "on"),
+    ("walk1", 2, 4, (49, 89), (13, 89), (10, 50), (38, 57), 0, 0, "on"),
     ("walk2", 0, 1, (35, 89), (31, 77), (40, 59), (22, 58), 0, 0, "on"),
-    ("walk3", 2, -3, (16, 89), (46, 89), (53, 54), (9, 55), 0, 0, "on"),
+    ("walk3", 2, -3, (16, 89), (46, 89), (54, 53), (2, 50), 0, 0, "on"),
     ("walk4", 0, 0, (37, 77), (27, 89), (44, 59), (17, 58), 0, 0, "on"),
     ("shoot", 0, 1, (37, 89), (25, 89), (57, 44), (53, 41), 1, 0, "on"),
     ("shoot1", 2, 4, (49, 89), (13, 89), (57, 46), (53, 43), 1, 0, "on"),
@@ -462,7 +462,7 @@ def robot_frame(pose):
     hipy = 57 + dy
     fhip, bhip = (35 + ln * 0.5, hipy), (27 + ln * 0.5, hipy)
     # shoulders follow their arm: they roll back when the arm swings back, forward when it swings forward
-    roll = lambda hx, rest: max(-5, min(4, (hx - rest) * 0.35))
+    roll = lambda hx, rest: max(-8, min(4, (hx - rest) * 0.4))
     fr, br = roll(fh[0], 42), roll(bh[0], 19)
     fsh = (42 + ln + fr, 32 + dy + abs(fr) * 0.2)
     bsh = (21 + ln + br, 32 + dy + abs(br) * 0.2)
