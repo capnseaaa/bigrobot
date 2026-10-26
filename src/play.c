@@ -889,6 +889,10 @@ static void robot_update(void) {
             R.shoot_t = 16;
         }
         int wf = (R.walk >> 11) & 3;
+        // heavy footfalls: a little shake each time a foot lands
+        static int last_wf;
+        if (R.moving && wf != last_wf && (wf & 1) == 0) shake(3, 1);
+        last_wf = wf;
         if (R.hurt_t > 6) R.frame = RF_HURT;
         else if (R.shoot_t) R.frame = R.moving ? RF_SHOOT1 + wf : RF_SHOOT;
         else R.frame = R.moving ? RF_WALK1 + wf : RF_STAND;

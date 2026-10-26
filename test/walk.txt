@@ -1,0 +1,22 @@
+# watch the walk cycle
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+30 0
+1 1
+1 0
+40 0
+1 1
+1 0
+100 0
+4 0 w0.ppm
+4 0 w1.ppm
+4 0 w2.ppm
+4 0 w3.ppm
+4 0 w4.ppm
+4 0 w5.ppm
+4 0 w6.ppm
+4 0 w7.ppm
