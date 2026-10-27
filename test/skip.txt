@@ -1,0 +1,19 @@
+# intro: no skip prompt before 3 s; then HOLD B TO SKIP; a short tap does nothing; holding B for a second skips to HOW TO PLAY
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+20 0
+1 1
+1 0
+150 0 k_early.ppm
+40 0 k_prompt.ppm
+20 2
+10 0 k_tap.ppm
+1 0 @$scene
+30 2 k_hold.ppm
+40 2
+20 0 k_howto.ppm
+1 0 @$scene

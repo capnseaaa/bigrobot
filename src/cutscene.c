@@ -13,6 +13,7 @@ static int imin32(int a, int b) { return a < b ? a : b; }
 static int imax32(int a, int b) { return a > b ? a : b; }
 
 static int cs_t, shot, shot_t;
+static int skip_hold;   // frames B has been held during the intro
 
 // ---- small effects list: booms and sparks
 #define MAX_CFX 16
@@ -190,6 +191,7 @@ static void shot_enter(int s) {
 
 void intro_enter(void) {
     cs_t = 0;
+    skip_hold = 0;
     shk = 0;
     shot_enter(SH_CITY);
 }
@@ -317,11 +319,27 @@ static void intro_shot(void) {
     }
 }
 
-// returns 1 when the intro is over (it plays all the way through)
+// after 3 seconds: "HOLD B TO SKIP" on a dark strip in the bottom right corner
+static void skip_prompt(void) {
+    for (int x = 14; x <= 29; x++) put_tile(x, 19, HUD_PANEL);
+    txt(15, 19, "HOLD B TO SKIP", skip_hold ? 2 : 3);
+}
+
+// returns 1 when the intro is over (played through, or B held for a second)
 int intro_update(void) {
     cs_t++;
+    if (cs_t >= 180) {
+        skip_hold = (keys & KEY_B) ? skip_hold + 1 : 0;
+        if (skip_hold >= 60) {
+            fade(0, 0);
+            shake_x = shake_y = 0;
+            robot_lights(1);
+            return 1;
+        }
+    }
     shot_t++;
     intro_shot();
+    if (cs_t >= 180) skip_prompt();
     cfx_draw();
     cs_shake();
     if (shot_t >= shot_len[shot]) {
