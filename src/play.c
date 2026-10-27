@@ -29,6 +29,7 @@ static const char* banner2;
 static int banner_t;
 static int level_squish;
 static int lvlup, lvl_sel;      // level-up popup showing, and its cursor
+static int dev_open, dev_sel, dev_lv;  // dev menu (L+R+B)
 static int lightning_t;
 #define MAX_WX 12
 static struct { s16 x, y; } wx[MAX_WX];   // weather particles (screen space)
@@ -225,7 +226,7 @@ static void enemy_box(Enemy* e, int* x0, int* y0, int* x1, int* y1) {
 }
 
 static void hurt(int n) {
-    if (R.inv || R.st == RS_DEAD || phase == PH_BOOM || phase == PH_CLEAR) return;
+    if (R.inv || R.st == RS_DEAD || phase == PH_BOOM || phase == PH_CLEAR || dev_sw[DV_GOD]) return;
     R.hp -= n;
     R.inv = 60;
     R.hurt_t = 12;
@@ -283,7 +284,7 @@ static void gain_xp(int n) {
 
 static void boss_damage(int n) {
     if (!B.on || B.st == BS_DIE || B.st == BS_ENTER) return;
-    n = n * (4 + up_lv[U_POWER]) / 4;
+    n = dev_sw[DV_ONEHIT] ? B.hp : n * (4 + up_lv[U_POWER]) / 4;
     B.hp -= n;
     B.flash = 4;
     if (B.hp <= 0) {
@@ -812,6 +813,10 @@ static void beam_update(void) {
         enemy_box(e, &x0, &y0, &x1, &y1);
         if (x1 < cam || x0 > cam + 240) continue;
         int d = beam_hits(ex, ey, x0, y0, x1, y1, dmax);
+        if (d >= 0 && dev_sw[DV_SAFEEYE]) {
+            if (e->st == ES_LIVE) enemy_kill(e, 0);
+            continue;
+        }
         if (d >= 0) {
             beam_len = d;
             world_boom(e);
@@ -826,6 +831,11 @@ static void beam_update(void) {
 
 static void robot_update(void) {
     int sp = walk_spd[up_lv[U_SPEED]];
+    if (dev_sw[DV_FAST]) sp *= 3;
+    if (dev_sw[DV_NOCOOL]) {
+        R.fire_cd = R.eye_cd = R.slam_cd = 0;
+        R.claps = 2 + up_lv[U_THUNDER];
+    }
     if (R.inv) R.inv--;
     if (R.hurt_t) R.hurt_t--;
     if (R.fire_cd) R.fire_cd--;
@@ -1315,6 +1325,97 @@ static void levelup_screen(void) {
     draw_upgrade_choices(8, lvl_sel, 1);
 }
 
+// ---- dev menu: L+R+B in a level. Six switches, then one-shot actions.
+enum { DM_SKIP = DV_COUNT, DM_CLEAR, DM_LVLUP, DM_MAX, DM_GOTO, DM_COUNT };
+static const char* const dev_names[DM_COUNT] = {
+    "ENEMIES", "GOD MODE", "ONE-HIT BOSSES", "NO COOLDOWNS", "SAFE EYES", "FAST WALK",
+    "SKIP TO BOSS", "CLEAR LEVEL", "LEVEL UP", "MAX UPGRADES", "GO TO LEVEL",
+};
+
+static void dev_screen(void) {
+    txt_clear_rows(3, 19);
+    panel_rows(3, 19);
+    txt_big_center(4, "DEV MODE");
+    for (int i = 0; i < DM_COUNT; i++) {
+        int y = 7 + i;
+        txt(3, y, i == dev_sel ? ">" : " ", 3);
+        txt(4, y, dev_names[i], i == dev_sel ? 3 : 2);
+        if (i < DV_COUNT) {
+            int on = i == DV_NOENEMY ? !dev_sw[i] : dev_sw[i];
+            txt(21, y, on ? "ON " : "OFF", 3);
+        } else if (i == DM_GOTO) {
+            char b[8] = "- ";
+            num_str(b + 2, dev_lv);
+            int n = 2;
+            while (b[n]) n++;
+            b[n++] = ' ';
+            b[n++] = '+';
+            b[n] = 0;
+            txt(21, y, b, 3);
+        }
+    }
+    txt(3, 18, "A SET  B CLOSE  NO SAVING", 2);
+}
+
+static void dev_close(void) {
+    dev_open = 0;
+    txt_clear_rows(3, 19);
+    banner_t = 0;
+    R.pend_l = R.pend_r = 0;
+}
+
+// returns an event when an action leaves the level
+static int dev_update(void) {
+    if (pressed & KEY_UP) { dev_sel = (dev_sel + DM_COUNT - 1) % DM_COUNT; sfx(SFX_SELECT); dev_screen(); }
+    if (pressed & KEY_DOWN) { dev_sel = (dev_sel + 1) % DM_COUNT; sfx(SFX_SELECT); dev_screen(); }
+    if (dev_sel == DM_GOTO && (pressed & (KEY_LEFT | KEY_RIGHT))) {
+        dev_lv = (pressed & KEY_RIGHT) ? dev_lv % LAST_LEVEL + 1 : (dev_lv + LAST_LEVEL - 2) % LAST_LEVEL + 1;
+        sfx(SFX_SELECT);
+        dev_screen();
+    }
+    if (pressed & KEY_B) { dev_close(); return EV_NONE; }
+    if (!(pressed & KEY_A)) return EV_NONE;
+    sfx(SFX_PICKUP);
+    if (dev_sel < DV_COUNT) {
+        dev_sw[dev_sel] ^= 1;
+        dev_screen();
+        return EV_NONE;
+    }
+    int live = phase == PH_WALK || phase == PH_WARN || phase == PH_BOSS || phase == PH_RUSHGAP;
+    switch (dev_sel) {
+    case DM_SKIP:
+        if (phase == PH_WALK) {
+            cam = level_len;
+            R.x = F8(cam + 60);
+        }
+        break;
+    case DM_CLEAR:
+        if (live) {
+            B.on = 0;
+            rush_i = MEGA_ID;
+            phase = PH_BOSS;
+            for (int i = 0; i < MAX_EN; i++)
+                if (en[i].st == ES_LIVE) en[i].st = ES_FLEE;
+        }
+        break;
+    case DM_LVLUP:
+        if (xp < xp_need()) xp = xp_need();
+        break;
+    case DM_MAX:
+        max_upgrades();
+        R.maxhp = 20 + 5 * up_lv[U_ARMOR];
+        R.hp = R.maxhp;
+        R.claps = 2 + up_lv[U_THUNDER];
+        break;
+    case DM_GOTO:
+        level = dev_lv;
+        dev_open = 0;
+        return EV_GOTO;
+    }
+    dev_close();
+    return EV_NONE;
+}
+
 // weather for each area: embers, rain, dust, sparks, snow, none, embers
 static void weather_update(int dcam) {
     static const s8 vx[THEME_COUNT] = { -1, -2, -3, -1, -1, 0, 0 };
@@ -1374,7 +1475,7 @@ void play_enter(void) {
     for (int i = 0; i < MAX_PK; i++) pk[i].on = 0;
     B.on = 0;
     cam = 0;
-    level_len = boss_only ? 40 : 1700 + level * 120;
+    level_len = dev_sw[DV_NOENEMY] ? 40 : 1700 + level * 120;
     R.x = F8(60);
     R.gy = GROUND_Y;
     R.y = F8(R.gy);
@@ -1400,6 +1501,7 @@ void play_enter(void) {
     banner_t = 0;
     level_squish = 0;
     lvlup = 0;
+    dev_open = 0;
     lightning_t = 0;
     for (int i = 0; i < MAX_WX; i++) {
         wx[i].x = rndr(240);
@@ -1420,11 +1522,29 @@ void play_enter(void) {
         phase = PH_WALK;
         phase_t = 0;
         music(SONG_LEVEL);
-        set_banner("GO!", boss_only ? "BOSSES ONLY" : theme_names[theme], 90);
+        set_banner("GO!", dev_sw[DV_NOENEMY] ? "BOSSES ONLY" : theme_names[theme], 90);
     }
 }
 
 int play_update(void) {
+    if (dev_open) {
+        int ev = dev_update();
+        draw_world();
+        return ev;
+    }
+    // L+R+B together: open the dev menu (a thunderclap that just started from L+R is refunded)
+    if ((keys & (KEY_L | KEY_R | KEY_B)) == (KEY_L | KEY_R | KEY_B) && (pressed & (KEY_L | KEY_R | KEY_B)) &&
+        !lvlup && !paused && phase != PH_BOOM && phase != PH_DEAD && phase != PH_CLEAR) {
+        if (R.st == RS_CLAP && R.t < 10) { R.st = RS_FREE; R.claps++; }
+        dev_open = 1;
+        dev_run = 1;
+        dev_lv = level;
+        dev_sel = 0;
+        dev_screen();
+        sfx(SFX_SELECT);
+        draw_world();
+        return EV_NONE;
+    }
     if (phase != PH_BOOM && phase != PH_DEAD && (pressed & KEY_START)) {
         paused ^= 1;
         pause_screen(paused);
@@ -1492,7 +1612,7 @@ int play_update(void) {
     case PH_WALK: {
         int target = (R.x >> 8) - 100;
         if (target > cam) cam = imin(target, level_len);
-        if (!boss_only && --spawn_t <= 0) {
+        if (!dev_sw[DV_NOENEMY] && --spawn_t <= 0) {
             int maxn = imin(10, 3 + level / 2);
             if (live_enemies() < maxn && cam < level_len - 120) {
                 enemy_spawn(cam + 252, rndr(100) < 35);

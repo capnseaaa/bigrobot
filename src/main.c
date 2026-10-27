@@ -11,8 +11,8 @@ u8 up_lv[U_COUNT];
 int level = 1;
 u32 squished;
 int plv, xp;
-static int dev_run;               // started from level select: do not overwrite the save
-int boss_only;                    // dev switch: no normal enemies, straight to each boss
+int dev_run;                      // level select or dev menu used: do not overwrite the save
+u8 dev_sw[DV_COUNT];
 
 static u16 oam_buf[512];
 static int oam_n;
@@ -338,13 +338,17 @@ static void continue_game(void) {
         if (up_lv[i] > up_max[i]) up_lv[i] = up_max[i];
 }
 
+void max_upgrades(void) {
+    for (int i = 0; i < U_COUNT; i++) up_lv[i] = up_max[i];
+}
+
 static void new_game(void) {
     level = 1;
     for (int i = 0; i < U_COUNT; i++) up_lv[i] = 0;
     squished = 0;
     plv = xp = 0;
     dev_run = 0;
-    boss_only = 0;
+    for (int i = 0; i < DV_COUNT; i++) dev_sw[i] = 0;
 }
 
 int xp_need(void) { return 6 + plv * 3; }
@@ -552,6 +556,7 @@ static void scene_update(void) {
         else if (ev == EV_DEAD) goto_scene(SC_GAMEOVER);
         else if (ev == EV_BOOM) goto_scene(SC_LAVA);
         else if (ev == EV_WIN) goto_scene(SC_WIN);
+        else if (ev == EV_GOTO) goto_scene(SC_CARD);
         break;
     }
     case SC_UPGRADE:
@@ -615,9 +620,8 @@ static void scene_update(void) {
             new_game();
             level = st_sel;
             dev_run = 1;
-            boss_only = dev_boss;
-            if (dev_max)
-                for (int i = 0; i < U_COUNT; i++) up_lv[i] = up_max[i];
+            dev_sw[DV_NOENEMY] = dev_boss;
+            if (dev_max) max_upgrades();
             goto_scene(SC_CARD);
         }
         if (pressed & KEY_B) goto_scene(SC_TITLE);

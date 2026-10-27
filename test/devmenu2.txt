@@ -1,0 +1,83 @@
+# dev menu: go to level, safe eyes, god mode, level up
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+30 0
+1 1
+1 0
+40 0
+1 1
+1 0
+60 0
+1 770
+10 0
+# GO TO LEVEL (UP wraps to the bottom), RIGHT x4 -> level 5
+1 64
+1 0
+1 16
+1 0
+1 16
+1 0
+1 16
+1 0
+1 16
+1 0
+5 0 e_goto.ppm
+1 1
+1 0
+40 0 e_card.ppm
+1 0 @$level
+1 1
+1 0
+60 0
+# SAFE EYES + GOD MODE on
+1 770
+10 0
+1 128
+1 0
+1 1
+1 0
+1 128
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 1
+1 0
+5 0 e_sw.ppm
+1 2
+1 0
+300 0
+1 0 @$squished
+1 256
+60 0 e_eyes.ppm
+1 0 @$phase,$squished
+600 0 e_god.ppm
+1 0 @$R+20,$R+24
+# LEVEL UP: index 8 (UP x3 from SAFE EYES row 4? cursor resets to 0) -> DOWN x8
+1 770
+10 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 1
+1 0
+30 0 e_lvlup.ppm

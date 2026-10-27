@@ -43,7 +43,11 @@ enum { U_HAND, U_EYE, U_STOMP, U_SLAM, U_ARMOR, U_THUNDER, U_SPEED, U_POWER, U_C
 extern u8 up_lv[U_COUNT];
 extern int level;          // 1..LAST_LEVEL
 extern u32 squished;
-extern int boss_only;      // dev switch: skip the normal enemies
+// dev menu (L+R+B in a level): test switches, cleared by a new game
+enum { DV_NOENEMY, DV_GOD, DV_ONEHIT, DV_NOCOOL, DV_SAFEEYE, DV_FAST, DV_COUNT };
+extern u8 dev_sw[DV_COUNT];
+extern int dev_run;        // no saving for this run
+void max_upgrades(void);
 extern int plv, xp;        // player level and experience toward the next one
 int xp_need(void);
 void save_game(void);
@@ -60,7 +64,7 @@ void goto_scene(int s);
 // ---- play.c: the level itself
 void play_enter(void);
 int play_update(void);
-enum { EV_NONE, EV_CLEAR, EV_DEAD, EV_BOOM, EV_WIN };
+enum { EV_NONE, EV_CLEAR, EV_DEAD, EV_BOOM, EV_WIN, EV_GOTO };
 
 // ---- sound.c
 void snd_init(void);

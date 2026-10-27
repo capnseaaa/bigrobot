@@ -1,0 +1,54 @@
+# in-game dev menu (L+R+B): switches, skip to boss, one-hit boss, go to level, safe eyes, clap refund
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+30 0
+1 1
+1 0
+40 0
+1 1
+1 0
+120 0
+# L+R first, B two frames later: menu opens and the clap is refunded
+1 768
+2 770
+10 770 d_menu.ppm
+1 0 @$R+56
+1 0 @$dev_run
+1 1
+1 0
+1 128
+1 0
+1 1
+1 0
+1 128
+1 0
+1 1
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 128
+1 0
+1 1
+1 0
+5 0 d_switches.ppm
+1 0 @$dev_sw+0
+1 0 @$dev_sw+2
+# skip to boss (DOWN once more onto SKIP TO BOSS, A)
+1 128
+1 0
+1 1
+1 0
+200 0 d_skip.ppm
+1 0 @$phase
+1 0 @$B+44
+40 2
+1 0 @$B+44
+150 0 d_clear.ppm
