@@ -1,5 +1,8 @@
 # level 13 (Ice Age): weather, shadows, level-up popup; level 16 (Neon Nights); lava screen choices
 60 0
+1 8
+1 0
+10 0
 1 772
 1 0
 1 64
@@ -49,6 +52,9 @@
 1 0
 ^
 60 0
+1 8
+1 0
+10 0
 1 772
 1 0
 1 64

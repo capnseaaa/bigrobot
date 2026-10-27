@@ -16,6 +16,9 @@ int iabs(int v);
 int idiv(int a, int b);
 
 void spr(int x, int y, int shape, int size, int tile, int pal, int hf, int vf);
+// aff >= 0: affine (double size) with matrix aff; prio 0..3
+void spr_ex(int x, int y, int shape, int size, int tile, int pal, int hf, int prio, int aff);
+void aff_mat(int i, int pa, int pb, int pc, int pd);
 void upload(void* dst, const void* src, int words);
 extern int shake_x, shake_y;
 extern int bg_x[4];
@@ -30,6 +33,10 @@ void put_tile(int x, int y, u16 t);
 void num_str(char* out, int v);
 void fade(int mode, int v);           // mode 0 off, 1 to white, 2 to black; v 0..16
 void set_theme_pal(int theme, int redshift);
+enum { SCR_TITLE, SCR_LAVA, SCR_WIN, SCR_ICITY, SCR_EARTH, SCR_POWER, SCR_DAWN };
+void video_screen(int which);   // a full-screen picture on BG2, text on BG0
+void video_play(int theme);
+void gradient(int on);          // backdrop color per scanline from grad[]
 
 extern u16 grad[160];
 extern volatile int grad_on;
@@ -61,13 +68,19 @@ void pick_upgrades(void);
 void draw_upgrade_choices(int y0, int sel, int panel);
 int take_upgrade(int sel);
 
-enum { SC_TITLE, SC_HOWTO, SC_CARD, SC_PLAY, SC_UPGRADE, SC_LAVA, SC_GAMEOVER, SC_WIN, SC_DEV, SC_MODE, SC_STATS };
+enum { SC_TITLE, SC_HOWTO, SC_CARD, SC_PLAY, SC_UPGRADE, SC_LAVA, SC_GAMEOVER, SC_WIN, SC_DEV, SC_MODE, SC_STATS, SC_INTRO };
 void goto_scene(int s);
 
 // ---- play.c: the level itself
 void play_enter(void);
 int play_update(void);
 enum { EV_NONE, EV_CLEAR, EV_DEAD, EV_BOOM, EV_WIN, EV_GOTO };
+
+// ---- cutscene.c
+void intro_enter(void);
+int intro_update(void);
+void ending_enter(void);
+int ending_update(void);
 
 // ---- sound.c
 void snd_init(void);

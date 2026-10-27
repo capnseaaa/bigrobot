@@ -1,0 +1,18 @@
+# intro: every shot, then the title
+60 0 i_city0.ppm
+70 0 i_city1.ppm
+100 0 i_city2.ppm
+90 0 i_sky0.ppm
+100 0 i_sky1.ppm
+80 0 i_sky2.ppm
+90 0 i_bad0.ppm
+160 0 i_bad1.ppm
+130 0 i_bad2.ppm
+90 0 i_pow0.ppm
+75 0 i_pow1.ppm
+48 0 i_pow2.ppm
+6 0 i_pow3.ppm
+20 0 i_pow4.ppm
+8 0 i_pow5.ppm
+50 0 i_pow6.ppm
+100 0 i_title.ppm

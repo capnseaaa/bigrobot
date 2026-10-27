@@ -54,6 +54,22 @@ int idiv(int a, int b) { return b ? a / b : 0; }
 
 // ---------------------------------------------------------------- sprites and uploads
 
+void spr_ex(int x, int y, int shape, int size, int tile, int pal, int hf, int prio, int aff) {
+    if (oam_n >= 128 || x <= -128 || x >= 240 || y <= -128 || y >= 160) return;
+    u16* o = &oam_buf[oam_n * 4];
+    o[0] = (y & 255) | (shape << 14) | (aff >= 0 ? 0x300 : 0);
+    o[1] = (x & 511) | (size << 14) | (aff >= 0 ? (aff << 9) : (hf << 12));
+    o[2] = tile | (prio << 10) | (pal << 12);
+    oam_n++;
+}
+
+void aff_mat(int i, int pa, int pb, int pc, int pd) {
+    oam_buf[i * 16 + 3] = pa;
+    oam_buf[i * 16 + 7] = pb;
+    oam_buf[i * 16 + 11] = pc;
+    oam_buf[i * 16 + 15] = pd;
+}
+
 void spr(int x, int y, int shape, int size, int tile, int pal, int hf, int vf) {
     if (oam_n >= 128 || x <= -64 || x >= 240 || y <= -64 || y >= 160) return;
     u16* o = &oam_buf[oam_n * 4];
@@ -199,7 +215,7 @@ void set_theme_pal(int theme, int red) {
     }
 }
 
-static void gradient(int on) {
+void gradient(int on) {
     grad_on = on;
     REG_IE = on ? 3 : 1;
     if (!on) BG_PAL[0] = 0;
@@ -222,9 +238,7 @@ static void video_text(void) {
 }
 
 // A full-screen 8bpp picture on BG2 with text on BG0.
-enum { SCR_TITLE, SCR_LAVA, SCR_WIN };
-
-static void video_screen(int which) {
+void video_screen(int which) {
     REG_DISPCNT = 0x80;
     gradient(0);
     reset_layers();
@@ -234,6 +248,10 @@ static void video_screen(int which) {
     int nt;
     if (which == SCR_TITLE) { tiles = title_tiles; map = title_map; pal = title_pal; nt = sizeof(title_tiles); }
     else if (which == SCR_LAVA) { tiles = lava_tiles; map = lava_map; pal = lava_pal; nt = sizeof(lava_tiles); }
+    else if (which == SCR_ICITY) { tiles = icity_tiles; map = icity_map; pal = icity_pal; nt = sizeof(icity_tiles); }
+    else if (which == SCR_EARTH) { tiles = earth_tiles; map = earth_map; pal = earth_pal; nt = sizeof(earth_tiles); }
+    else if (which == SCR_POWER) { tiles = power_tiles; map = power_map; pal = power_pal; nt = sizeof(power_tiles); }
+    else if (which == SCR_DAWN) { tiles = dawn_tiles; map = dawn_map; pal = dawn_pal; nt = sizeof(dawn_tiles); }
     else { tiles = win_tiles; map = win_map; pal = win_pal; nt = sizeof(win_tiles); }
     dma32((void*)CHARBLOCK(0), tiles, nt / 4);
     fill32((void*)SCREENBLOCK(18), 0, 512);
@@ -468,9 +486,12 @@ static void title_text(void) {
     }
 }
 
+// the stats block is centered: names left-aligned at column 4, values right-aligned to column 25
 static void stat_line(int y, const char* name, const char* val) {
+    int n = 0;
+    while (val[n]) n++;
     txt(4, y, name, 1);
-    txt(19, y, val, 0);
+    txt(26 - n, y, val, 0);
 }
 
 static void stats_screen(void) {
@@ -568,9 +589,11 @@ void goto_scene(int s) {
         txt_center(13, "B   TITLE   ", 1);
         break;
     case SC_WIN:
-        video_screen(SCR_WIN);
-        music(SONG_WIN);
         save_game();   // keep the finished run's stats
+        ending_enter();
+        break;
+    case SC_INTRO:
+        intro_enter();
         break;
     case SC_MODE:
         video_text();
@@ -710,9 +733,10 @@ static void scene_update(void) {
         if (st_t > 30 && (pressed & KEY_B)) goto_scene(SC_TITLE);
         break;
     case SC_WIN:
-        txt_clear_rows(18, 18);
-        if (st_t > 90 && ((st_t >> 5) & 1)) txt_center(18, "THE END   PRESS START", 0);
-        if (st_t > 90 && (pressed & KEY_START)) goto_scene(SC_STATS);
+        if (ending_update()) goto_scene(SC_STATS);
+        break;
+    case SC_INTRO:
+        if (intro_update()) goto_scene(SC_TITLE);
         break;
     case SC_DEV: {
         if (pressed & KEY_UP) st_sel = st_sel % LAST_LEVEL + 1;
@@ -751,7 +775,7 @@ int main(void) {
     snd_init();
     load_save();
     (void)*(volatile const char*)save_tag;
-    goto_scene(SC_TITLE);
+    goto_scene(SC_INTRO);
     for (;;) {
         vsync();
         vblank_work();

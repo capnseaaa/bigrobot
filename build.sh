@@ -6,10 +6,10 @@ python3 tools/make_art.py
 CFLAGS="-mcpu=arm7tdmi -mthumb-interwork -O2 -ffreestanding -fno-builtin -Wall"
 mkdir -p build
 arm-none-eabi-gcc -mcpu=arm7tdmi -c src/crt0.s -o build/crt0.o
-for f in main play sound art; do
+for f in main play cutscene sound art; do
     arm-none-eabi-gcc $CFLAGS -mthumb -c src/$f.c -o build/$f.o
 done
 arm-none-eabi-gcc $CFLAGS -marm -c src/irq.c -o build/irq.o
-arm-none-eabi-gcc -mcpu=arm7tdmi -mthumb-interwork -nostdlib -T src/gba.ld build/crt0.o build/main.o build/play.o build/sound.o build/art.o build/irq.o -lgcc -o build/bigrobot.elf
+arm-none-eabi-gcc -mcpu=arm7tdmi -mthumb-interwork -nostdlib -T src/gba.ld build/crt0.o build/main.o build/play.o build/cutscene.o build/sound.o build/art.o build/irq.o -lgcc -o build/bigrobot.elf
 arm-none-eabi-objcopy -O binary build/bigrobot.elf bigrobot.gba
 python3 tools/fixheader.py bigrobot.gba

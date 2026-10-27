@@ -1,5 +1,8 @@
 # Mega Robot phase 3: armor, only eye lasers hurt it
 60 0
+1 8
+1 0
+10 0
 1 772
 1 0
 1 256

@@ -1,5 +1,8 @@
 # stats: final level via level select, beat the Mega Robot, stats screen after THE END; title STATS entry
 60 0
+1 8
+1 0
+10 0
 1 772
 1 0
 1 128
@@ -15,7 +18,16 @@
 1 0 !$B+44=1
 80 2
 1 0 !$play_frames=226800
-500 0
+220 0
+100 0 e_1.ppm
+100 0 e_2.ppm
+100 0 e_3.ppm
+60 0 e_4.ppm
+56 0 e_5.ppm
+18 0 e_6.ppm
+1 0 @$cs_t,$walk_x
+100 0 e_7.ppm
+70 0 e_8.ppm
 1 8
 1 0
 40 0 s_stats.ppm

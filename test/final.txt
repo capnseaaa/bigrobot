@@ -1,5 +1,8 @@
 # level select -> level 15 -> mega robot -> win; then game over check
 60 0
+1 8
+1 0
+10 0
 1 772
 1 0
 10 0 f_dev.ppm

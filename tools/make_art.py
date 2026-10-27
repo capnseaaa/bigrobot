@@ -2541,9 +2541,10 @@ def screen_to_tiles(name, img, lava=None, lava_ramp=None):
     pal = [(0, 0, 0)] + [tuple(qp[i * 3:i * 3 + 3]) for i in range(limit)]
     idx = Canvas(W, Hh)
     qd = list(q.get_flattened_data()) if hasattr(q, 'get_flattened_data') else list(q.getdata())
+    src = img.load()
     for y in range(Hh):
         for x in range(W):
-            idx.p[y][x] = qd[y * W + x] + 1
+            idx.p[y][x] = 0 if src[x, y] == CLEAR else qd[y * W + x] + 1
     lava_base = len(pal)
     if lava:
         for (x, y), band in lava.items():
@@ -2575,11 +2576,336 @@ LAVA_RAMP = [H(c) for c in ["#ff2000", "#ff4808", "#ff7010", "#ff9818", "#ffc030
                             "#ff9818", "#ff7010", "#ff4808", "#e01800", "#c01000"]]
 
 
+# ---------------------------------------------------------------- cutscenes (intro and ending)
+
+CLEAR = (255, 0, 255)   # in a picture: transparent (the backdrop gradient shows through)
+
+INTRO_PAL = [(0, 0, 0), H("#1a1010"), H("#f4cca4"), H("#d8a07a"), H("#c88c5c"), H("#a06a40"), H("#7a4a2a"),
+             H("#56321a"), H("#1c1c24"), H("#6a3a18"), H("#e8c040"), H("#c84818"), H("#ffffff"), H("#7a1414"),
+             H("#101018"), H("#60a0ff")]
+HEADS = [((2, 3), 8), ((4, 5), 9), ((6, 7), 8), ((2, 3), 10), ((4, 5), 11), ((6, 7), 9)]
+
+
+def head(skin, hair, face):
+    cv = Canvas(16, 16)
+    part(cv, (skin[1], skin[1], skin[0], skin[0]), lambda m: m.ellipse(8, 9, 5.5, 5.5, 1))
+    # hair cap
+    hc = Canvas(16, 16)
+    hc.ellipse(8, 7, 6, 4.5, 1)
+    for y in range(16):
+        for x in range(16):
+            if hc.p[y][x] and y <= 7 + (1 if x in (3, 4, 12, 13) else 0):
+                cv.px(x, y, hair)
+    cv.outline(1)
+    if face == "scared":
+        for ex in (6, 10):
+            cv.rect(ex - 1, 8, ex, 10, 12)
+            cv.px(ex, 9, 14)
+        cv.px(4, 7, 1); cv.px(5, 6, 1); cv.px(11, 6, 1); cv.px(12, 7, 1)   # eyebrows up
+        cv.rect(7, 12, 9, 14, 13)
+        cv.px(8, 12, 1)
+        cv.px(13, 9, 15); cv.px(13, 10, 15)                                 # sweat
+    else:
+        for ex in (6, 10):
+            cv.px(ex - 1, 9, 1); cv.px(ex, 8, 1); cv.px(ex + 1, 9, 1)         # happy closed eyes
+        cv.rect(6, 12, 10, 12, 1)
+        cv.rect(6, 12, 10, 13, 13)
+        cv.rect(7, 12, 9, 12, 12)
+        cv.px(4, 11, 13); cv.px(12, 11, 13)                                 # cheeks
+    return cv
+
+
+def asteroid(v):
+    cv = Canvas(16, 16)
+    # flame tail toward the upper right
+    for i in range(9):
+        t = i / 8
+        x, y = 8 + 7 * t, 8 - 7 * t
+        r = 3.6 * (1 - t) + 0.6
+        col = 10 if t < 0.35 else 9 if t < 0.7 else 8
+        if v and t > 0.5:
+            x += 1
+        cv.ellipse(x, y, r, r, col)
+    part(cv, (12, 12, 13, 13), lambda m: m.ellipse(6, 10, 4, 3.6, 1))
+    cv.px(5, 9, 12); cv.px(7, 11, 12)
+    cv.px(4, 8, 11)
+    return cv
+
+
+def kira(v):
+    cv = Canvas(16, 16)
+    r = 5 if v == 0 else 7
+    for i in range(-r, r + 1):
+        w = 0 if abs(i) > r // 2 else 1
+        cv.rect(8 + i, 8 - w, 8 + i, 8 + w, 7 if abs(i) > 2 else 11)
+        cv.rect(8 - w, 8 + i, 8 + w, 8 + i, 7 if abs(i) > 2 else 11)
+    cv.rect(7, 7, 9, 9, 11)
+    if v:
+        for d in (-3, 3):
+            cv.px(8 + d, 8 + d, 7); cv.px(8 + d, 8 - d, 7)
+    return cv
+
+
+def firework(f):
+    """32x32 burst in enemy-palette indices: 4/5 (that palette's suit color) and 9 (pale yellow)."""
+    cv = Canvas(32, 32)
+    r = [4, 8, 12, 14][f]
+    n = 14
+    drop = f * f * 0.4
+    for k in range(n):
+        a = k / n * 6.283
+        x, y = 16 + math.cos(a) * r, 15 + math.sin(a) * r + drop
+        if f < 3:
+            cv.rect(x - 1, y - 1, x, y, 9 if f < 2 else 5)          # bright head
+        else:
+            cv.px(x, y, 4)
+        for tr in (1, 2) if f < 3 else ():
+            rr = r - tr * 2.5
+            if rr > 1:
+                cv.px(16 + math.cos(a) * rr, 15 + math.sin(a) * rr + drop * 0.6, 5 if tr == 1 else 4)
+    if f == 0:
+        cv.rect(14, 13, 17, 16, 9)
+    return cv
+
+
+def build_cutscene_sprites():
+    words = []
+    for (skin, hair) in HEADS:
+        for face in ("scared", "happy"):
+            for t in tiles4(head(skin, hair, face)):
+                words.extend(pack4(t))
+    define("CS_HEAD", 0)            # 6 heads x (scared, happy), 4 tiles each
+    base = len(words) // 8
+    define("CS_ROCK", base)
+    for v in range(2):
+        for t in tiles4(asteroid(v)):
+            words.extend(pack4(t))
+    define("CS_KIRA", len(words) // 8)
+    for v in range(2):
+        for t in tiles4(kira(v)):
+            words.extend(pack4(t))
+    define("CS_BURST", len(words) // 8)
+    for f in range(4):
+        for t in tiles4(firework(f)):
+            words.extend(pack4(t))
+    emit_u32("cs_tiles", words)
+    define("CS_TILE_COUNT", len(words) // 8)
+    emit_u16("intro_pal", [g15(c) for c in INTRO_PAL])
+    # preview
+    sheet = Image.new("RGB", (16 * 12, 16 + 32))
+    for i, (skin, hair) in enumerate(HEADS):
+        for j, face in enumerate(("scared", "happy")):
+            cv = head(skin, hair, face)
+            for y in range(16):
+                for x in range(16):
+                    v = cv.p[y][x]
+                    sheet.putpixel((i * 32 + j * 16 + x, y), INTRO_PAL[v] if v else (60, 0, 60))
+    for i, cv in enumerate([asteroid(0), asteroid(1), kira(0), kira(1)]):
+        for y in range(16):
+            for x in range(16):
+                v = cv.p[y][x]
+                sheet.putpixel((i * 16 + x, 16 + y), FX_PAL[v] if v else (60, 0, 60))
+    pal = enemy_pal("#3a66d0")
+    for f in range(4):
+        cv = firework(f)
+        for y in range(32):
+            for x in range(32):
+                v = cv.p[y][x]
+                if 64 + f * 32 + x < sheet.size[0]:
+                    sheet.putpixel((64 + f * 32 + x, 16 + y), pal[v] if v else (20, 0, 20))
+    sheet.resize((sheet.size[0] * 4, sheet.size[1] * 4), Image.NEAREST).save(os.path.join(ART, "cutscene_sprites.png"))
+
+
+def sky_rgb(img, cols, y1=None):
+    W, Hh = img.size
+    y1 = y1 or Hh
+    n = len(cols) - 1
+    for y in range(y1):
+        t = y / max(1, y1 - 1) * n
+        i = min(n - 1, int(t))
+        c = mix(cols[i], cols[i + 1], t - i)
+        for x in range(W):
+            img.putpixel((x, y), c)
+
+
+def smoke_rgb(img, seed, n, y0, y1, c0, c1):
+    rnd = random.Random(seed)
+    W, Hh = img.size
+    for i in range(n):
+        cx, cy = rnd.uniform(0, W), rnd.uniform(y0, y1)
+        r = rnd.uniform(6, 15)
+        col = mix(c0, c1, rnd.random())
+        for y in range(int(cy - r), int(cy + r)):
+            for x in range(int(cx - r * 1.7), int(cx + r * 1.7)):
+                if 0 <= x < W and 0 <= y < Hh and ((x - cx) / 1.7) ** 2 + (y - cy) ** 2 < r * r:
+                    img.putpixel((x, y), col)
+
+
+def skyline_rgb(img, seed, base, hmin, hmax, body, win, ruined=False, wchance=0.3):
+    rnd = random.Random(seed)
+    W, Hh = img.size
+    x = -4
+    while x < W:
+        w = rnd.randint(12, 28)
+        h = rnd.randint(hmin, hmax)
+        top = base - h
+        for xx in range(max(0, x), min(W, x + w)):
+            t = top
+            if ruined:
+                t = top + int(abs(math.sin((xx - x) * 0.7 + x)) * 6 + (xx - x) % 5)
+            for yy in range(t, base):
+                img.putpixel((xx, yy), body)
+        for wy in range(top + 4, base - 4, 6):
+            for wx in range(x + 3, min(W, x + w) - 2, 4):
+                if 0 <= wx < W and rnd.random() < wchance:
+                    img.putpixel((wx, wy), win)
+                    if wx + 1 < W:
+                        img.putpixel((wx + 1, wy), win)
+        x += w + rnd.randint(0, 3)
+
+
+def screen_intro_city():
+    W, Hh = 240, 160
+    img = Image.new("RGB", (W, Hh))
+    sky_rgb(img, [H("#060000"), H("#3a0404"), H("#a01808"), H("#ff6010")], 120)
+    smoke_rgb(img, 21, 40, 40, 100, H("#1a0806"), H("#4a140a"))
+    # falling fireballs streaking across the sky
+    rnd = random.Random(5)
+    for i in range(5):
+        x0, y0 = rnd.uniform(60, 240), rnd.uniform(40, 70)
+        for k in range(26):
+            x, y = x0 - k * 1.6, y0 + k * 1.1
+            c = mix(H("#fff0a0"), H("#a01808"), k / 26)
+            if 0 <= int(x) < W and 0 <= int(y) < Hh:
+                img.putpixel((int(x), int(y)), c)
+    skyline_rgb(img, 3, 128, 25, 70, H("#160406"), H("#ff9030"), ruined=True)
+    flames_rgb(img, 80, 128, 9, [(H("#a01008"), 1.0), (H("#ff5010"), 0.7), (H("#ffd040"), 0.4)])
+    for y in range(128, Hh):
+        for x in range(W):
+            img.putpixel((x, y), mix(H("#2a0c08"), H("#0a0404"), (y - 128) / 32))
+    rnd = random.Random(7)
+    for i in range(40):   # rubble
+        x, y = rnd.randrange(W), rnd.randrange(130, Hh)
+        img.putpixel((x, y), H("#4a2018"))
+    return img
+
+
+def screen_earth():
+    W, Hh = 240, 160
+    img = Image.new("RGB", (W, Hh))
+    rnd = random.Random(31)
+    for i in range(70):
+        x, y = rnd.randrange(W), rnd.randrange(Hh)
+        img.putpixel((x, y), rnd.choice([H("#ffffff"), H("#8890b0"), H("#c0c8ff")]))
+    cx, cy, R = 120, 150, 78
+    for y in range(int(cy - R - 4), Hh):
+        for x in range(W):
+            d = math.hypot(x - cx, y - cy)
+            if d <= R:
+                nx, ny = (x - cx) / R, (y - cy) / R
+                nz = math.sqrt(max(0, 1 - nx * nx - ny * ny))
+                light = max(0.15, -0.55 * nx - 0.6 * ny + 0.55 * nz)
+                # continents from a few blobs
+                land = 0
+                for (bx, by, br) in ((-0.4, -0.5, 0.35), (0.2, -0.75, 0.25), (0.5, -0.3, 0.3), (-0.1, -0.2, 0.18)):
+                    if math.hypot(nx - bx + 0.08 * math.sin(ny * 9), ny - by) < br:
+                        land = 1
+                swirl = math.sin(nx * 6 + math.sin(ny * 9 + nx * 4) * 1.8 + ny * 3)
+                cloud = swirl > 0.82 or (math.sin(ny * 21 + nx * 2) > 0.93 and land == 0)
+                c = H("#2a9a3a") if land else H("#1a4aa8")
+                if land and nx > 0.45 and ny > -0.45:
+                    c = H("#9a7a3a")
+                if cloud:
+                    c = H("#e8f0ff")
+                img.putpixel((x, y), mul(c, min(1.2, light)))
+            elif d <= R + 3:
+                img.putpixel((x, y), mix(H("#60a0ff"), img.getpixel((x, y)), (d - R) / 3))
+    return img
+
+
+PYLONS = ((26, 24), (214, 24))       # tower tops; the cables run from here to the robot's shoulders
+CABLE_ENDS = ((84, 92), (156, 92))
+
+
+def screen_power():
+    W, Hh = 240, 160
+    img = Image.new("RGB", (W, Hh))
+    sky_rgb(img, [H("#02030c"), H("#0a1236"), H("#1a2a5a")], 130)
+    rnd = random.Random(41)
+    for i in range(50):
+        x, y = rnd.randrange(W), rnd.randrange(100)
+        img.putpixel((x, y), rnd.choice([H("#ffffff"), H("#8890c0")]))
+    # hills
+    for x in range(W):
+        h = int(118 + 6 * math.sin(x * 0.03) + 4 * math.sin(x * 0.11))
+        for y in range(h, 132):
+            img.putpixel((x, y), H("#0a1020"))
+    for y in range(130, Hh):
+        for x in range(W):
+            img.putpixel((x, y), mix(H("#141a26"), H("#06080c"), (y - 130) / 30))
+    # lattice towers
+    for (tx, ty) in PYLONS:
+        for y in range(ty, 140):
+            half = 2 + (y - ty) * 0.14
+            for xx in (int(tx - half), int(tx + half)):
+                img.putpixel((xx, y), H("#6a7488"))
+            if (y - ty) % 8 == 0:
+                for xx in range(int(tx - half), int(tx + half) + 1):
+                    img.putpixel((xx, y), H("#4a5468"))
+            k = (y - ty) % 8
+            img.putpixel((int(tx - half + k * half / 4), y), H("#3a4458"))
+        for xx in range(tx - 10, tx + 11):     # cross arm
+            img.putpixel((xx, ty + 4), H("#8a94a8"))
+    # cables sag from the arms toward the robot
+    for (tx, ty), (ex, ey) in zip(PYLONS, CABLE_ENDS):
+        for off in (-8, 8):
+            x0, y0 = tx + off, ty + 4
+            for i in range(200):
+                t = i / 199
+                x = x0 + (ex - x0) * t
+                y = y0 + (ey + off * 0.3 - y0) * t + 14 * math.sin(t * math.pi)
+                img.putpixel((int(x), int(y)), H("#c0c8d8") if off < 0 else H("#8890a4"))
+    # a glow where the robot will stand
+    for y in range(40, 140):
+        for x in range(60, 180):
+            d = math.hypot((x - 120) / 1.2, y - 100)
+            if d < 60:
+                img.putpixel((x, y), mix(img.getpixel((x, y)), H("#2a4a8a"), 0.35 * (1 - d / 60)))
+    return img
+
+
+def screen_dawn():
+    W, Hh = 240, 160
+    img = Image.new("RGB", (W, Hh), CLEAR)
+    # the sun (left, low) stays in the picture; the rest of the sky is the backdrop gradient
+    for y in range(60, 112):
+        for x in range(20, 80):
+            if math.hypot(x - 50, y - 100) < 20:
+                img.putpixel((x, y), mix(H("#fff4c0"), H("#ffc060"), max(0, (y - 82) / 30)))
+    skyline_rgb(img, 13, 128, 30, 64, H("#3a2438"), H("#ffd070"), wchance=0.45)
+    skyline_rgb(img, 17, 132, 12, 36, H("#24162a"), H("#ffb050"), wchance=0.3)
+    for y in range(132, Hh):
+        for x in range(W):
+            c = mix(H("#5a3a3a"), H("#1a1018"), (y - 132) / 28)
+            if y == 133:
+                c = H("#c08060")
+            img.putpixel((x, y), c)
+    for x in range(0, W, 24):    # street lines
+        for xx in range(x, x + 12):
+            img.putpixel((xx, 146), H("#e0b040"))
+    return img
+
+
 def build_screens(robot_frames, anchors, gl):
     screen_to_tiles("title", screen_title(robot_frames, anchors, gl))
     img, lava = screen_lava()
     screen_to_tiles("lava", img, lava, LAVA_RAMP)
     screen_to_tiles("win", screen_win(robot_frames, anchors, gl))
+    screen_to_tiles("icity", screen_intro_city())
+    screen_to_tiles("earth", screen_earth())
+    screen_to_tiles("power", screen_power())
+    screen_to_tiles("dawn", screen_dawn())
+    build_cutscene_sprites()
     # cover art for the card (640x640)
     t = screen_title(robot_frames, anchors, gl)
     cover = Image.new("RGB", (640, 640))
