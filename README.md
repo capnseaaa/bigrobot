@@ -18,7 +18,7 @@ Every new save starts with an intro (after 3 seconds, hold B to skip it). The wo
 | L + R | Thunderclap: stuns every enemy (no damage). Only 2 per level (more with upgrades) |
 | START | Pause (SELECT in the pause menu turns the music on or off) |
 
-**Eye lasers are for bosses** (they do the real damage to them). If they hit one of the little guys, the whole world explodes and turns into a lava field. Then pick KEEP MY UPGRADES (back to level 1 with your upgrades) or START OVER.
+**Eye lasers are for bosses** (they do the real damage to them). If they hit one of the little guys while you march, the whole world explodes and turns into a lava field. (In a boss fight the beam just destroys any little guys in its way.) Then pick KEEP MY UPGRADES (back to level 1 with your upgrades) or START OVER.
 
 ## Game
 - The little guys look like War Machine suits in six colors (gunmetal, red, gold, blue, green, purple). All colors have the same stats. They walk or fly toward you from the right, but never higher than half the robot's height.
@@ -43,6 +43,6 @@ Needs `arm-none-eabi-gcc` and Python 3 with Pillow.
 sh bigrobot/build.sh          # -> bigrobot/bigrobot.gba
 ```
 
-Tests need `libmgba`: `sh bigrobot/test/run.sh test/play.txt` plays a scripted run and saves screenshots (also `boss.txt`, `boom.txt`, `clear.txt`, `final.txt`, `dead.txt`, `spike.txt`, `new.txt`, `walk.txt`, `bossonly.txt`, `devmenu.txt`, `devmenu2.txt`, `hard.txt`, `stats.txt`, `variants.txt`, `ninja.txt`, `titan.txt`, `mega.txt`, `intro.txt`, `skip.txt`, `devlock.txt`, `checkpoint.txt`; `migrate.txt` loads an old save given in `HARNESS_SAV`).
+Tests need `libmgba`: `sh bigrobot/test/run.sh test/play.txt` plays a scripted run and saves screenshots (also `boss.txt`, `boom.txt`, `clear.txt`, `final.txt`, `dead.txt`, `spike.txt`, `new.txt`, `walk.txt`, `bossonly.txt`, `devmenu.txt`, `devmenu2.txt`, `hard.txt`, `stats.txt`, `variants.txt`, `ninja.txt`, `titan.txt`, `mega.txt`, `intro.txt`, `skip.txt`, `devlock.txt`, `checkpoint.txt`, `bosseye.txt`; `migrate.txt` loads an old save given in `HARNESS_SAV`).
 
 No external GBA libraries. All art (robot, enemies, bosses, backgrounds, the metal font, the title, lava, intro and ending pictures) is drawn in code by `tools/make_art.py`; previews land in `art/`.

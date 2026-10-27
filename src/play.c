@@ -981,7 +981,9 @@ static void beam_update(void) {
         if (dboss >= 0) dmax = dboss;
     }
     beam_len = dmax;
-    // a normal enemy in the beam: that is the end of the world
+    // a normal enemy in the beam: that is the end of the world, but only on the march.
+    // In a boss fight (including the troopers a boss calls in) the beam just destroys them.
+    int safe = dev_sw[DV_SAFEEYE] || phase != PH_WALK;
     for (int i = 0; i < MAX_EN; i++) {
         Enemy* e = &en[i];
         if (e->st != ES_LIVE && e->st != ES_FLEE) continue;
@@ -989,7 +991,7 @@ static void beam_update(void) {
         enemy_box(e, &x0, &y0, &x1, &y1);
         if (x1 < cam || x0 > cam + 240) continue;
         int d = beam_hits(ex, ey, x0, y0, x1, y1, dmax);
-        if (d >= 0 && dev_sw[DV_SAFEEYE]) {
+        if (d >= 0 && safe) {
             if (e->st == ES_LIVE) enemy_kill(e, 0);
             continue;
         }
