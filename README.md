@@ -25,7 +25,7 @@ You are a huge, cool gray, slightly angry robot in black sunglasses. March throu
 - Every enemy you beat gives XP. A full XP bar pauses the game: LEVEL UP! and you pick another upgrade.
 - Seven areas with three levels each: Burning City, Night Storm, Wasteland, Steel Factory, Ice Age, Neon Nights, Hellfire. Each has its own weather (embers, rain and lightning, dust, snow).
 - The game saves at the start of every level. CONTINUE on the title screen picks up there.
-- Secret level select: on the title screen hold L + R and press SELECT.
+- Secret level select: on the title screen hold L + R and press SELECT. There, L maxes every upgrade and R turns the normal enemies off (bosses only, for clearing levels fast). Runs started here never touch your save.
 
 ## Build
 Needs `arm-none-eabi-gcc` and Python 3 with Pillow.
@@ -34,6 +34,6 @@ Needs `arm-none-eabi-gcc` and Python 3 with Pillow.
 sh bigrobot/build.sh          # -> bigrobot/bigrobot.gba
 ```
 
-Tests need `libmgba`: `sh bigrobot/test/run.sh test/play.txt` plays a scripted run and saves screenshots (also `boss.txt`, `boom.txt`, `clear.txt`, `final.txt`, `dead.txt`, `spike.txt`, `new.txt`, `walk.txt`; `migrate.txt` loads an old save given in `HARNESS_SAV`).
+Tests need `libmgba`: `sh bigrobot/test/run.sh test/play.txt` plays a scripted run and saves screenshots (also `boss.txt`, `boom.txt`, `clear.txt`, `final.txt`, `dead.txt`, `spike.txt`, `new.txt`, `walk.txt`, `bossonly.txt`; `migrate.txt` loads an old save given in `HARNESS_SAV`).
 
 No external GBA libraries. All art (robot, enemies, bosses, backgrounds, the metal font, the title and lava screens) is drawn in code by `tools/make_art.py`; previews land in `art/`.

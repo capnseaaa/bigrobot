@@ -1,0 +1,40 @@
+# dev switch: level select with R (enemies off) -> straight to each boss, carries to level 2
+60 0
+1 772
+1 0
+1 256
+1 0
+10 0 o_dev.ppm
+1 1
+1 0
+40 0 o_card.ppm
+1 1
+1 0
+60 0 o_go.ppm
+120 0 o_warn.ppm
+200 0 o_boss.ppm
+1 0 @$B+44
+1 0 @$phase
+1 0 !$B+44=1
+1 0 @$B+44
+20 32
+20 2
+20 32
+20 2
+20 32
+20 2
+20 32
+20 2
+20 32
+20 2
+1 0 @$B+44
+60 0
+120 0 o_clear.ppm
+150 0 o_upgrade.ppm
+1 1
+1 0
+40 0 o_card2.ppm
+1 1
+1 0
+100 0 o_go2.ppm
+100 0 o_boss2.ppm

@@ -43,6 +43,7 @@ enum { U_HAND, U_EYE, U_STOMP, U_SLAM, U_ARMOR, U_THUNDER, U_SPEED, U_POWER, U_C
 extern u8 up_lv[U_COUNT];
 extern int level;          // 1..LAST_LEVEL
 extern u32 squished;
+extern int boss_only;      // dev switch: skip the normal enemies
 extern int plv, xp;        // player level and experience toward the next one
 int xp_need(void);
 void save_game(void);

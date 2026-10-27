@@ -1374,7 +1374,7 @@ void play_enter(void) {
     for (int i = 0; i < MAX_PK; i++) pk[i].on = 0;
     B.on = 0;
     cam = 0;
-    level_len = 1700 + level * 120;
+    level_len = boss_only ? 40 : 1700 + level * 120;
     R.x = F8(60);
     R.gy = GROUND_Y;
     R.y = F8(R.gy);
@@ -1420,7 +1420,7 @@ void play_enter(void) {
         phase = PH_WALK;
         phase_t = 0;
         music(SONG_LEVEL);
-        set_banner("GO!", theme_names[theme], 90);
+        set_banner("GO!", boss_only ? "BOSSES ONLY" : theme_names[theme], 90);
     }
 }
 
@@ -1492,7 +1492,7 @@ int play_update(void) {
     case PH_WALK: {
         int target = (R.x >> 8) - 100;
         if (target > cam) cam = imin(target, level_len);
-        if (--spawn_t <= 0) {
+        if (!boss_only && --spawn_t <= 0) {
             int maxn = imin(10, 3 + level / 2);
             if (live_enemies() < maxn && cam < level_len - 120) {
                 enemy_spawn(cam + 252, rndr(100) < 35);
@@ -1573,7 +1573,7 @@ int play_update(void) {
     weather_update(cam - bg_x[1]);
     // a full XP bar: pause for a level-up pick
     if (xp >= xp_need() && R.st == RS_FREE && (phase == PH_WALK || phase == PH_BOSS || phase == PH_WARN) &&
-        !(B.on && B.st == BS_DIE) && (B.on || phase == PH_WALK)) {
+        !(B.on && B.st == BS_DIE) && (B.on || phase == PH_WALK) && banner_t == 0) {
         xp -= xp_need();
         plv++;
         pick_upgrades();

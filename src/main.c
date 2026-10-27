@@ -12,6 +12,7 @@ int level = 1;
 u32 squished;
 int plv, xp;
 static int dev_run;               // started from level select: do not overwrite the save
+int boss_only;                    // dev switch: no normal enemies, straight to each boss
 
 static u16 oam_buf[512];
 static int oam_n;
@@ -19,7 +20,7 @@ static int scene;
 static int st_t, st_sel;          // per-scene timer and menu cursor
 static u32 rng_state = 0x1234567;
 static int save_level;            // level stored in the save (0 = no save)
-static int dev_max;
+static int dev_max, dev_boss;
 
 const char save_tag[] = "SRAM_V113";
 
@@ -343,6 +344,7 @@ static void new_game(void) {
     squished = 0;
     plv = xp = 0;
     dev_run = 0;
+    boss_only = 0;
 }
 
 int xp_need(void) { return 6 + plv * 3; }
@@ -501,6 +503,7 @@ void goto_scene(int s) {
         txt_big_center(1, "LEVEL SELECT");
         st_sel = 1;
         dev_max = 0;
+        dev_boss = 0;
         break;
     }
 }
@@ -600,16 +603,19 @@ static void scene_update(void) {
         if (pressed & KEY_UP) st_sel = st_sel % LAST_LEVEL + 1;
         if (pressed & KEY_DOWN) st_sel = (st_sel + LAST_LEVEL - 2) % LAST_LEVEL + 1;
         if (pressed & KEY_L) dev_max ^= 1;
+        if (pressed & KEY_R) dev_boss ^= 1;
         char b[16] = "LEVEL ";
         num_str(b + 6, st_sel);
         txt_clear_rows(6, 16);
         txt_big_center(7, b);
         txt_center(11, dev_max ? "L  UPGRADES: ALL MAXED" : "L  UPGRADES: NONE     ", 1);
+        txt_center(12, dev_boss ? "R  ENEMIES: OFF, BOSSES ONLY" : "R  ENEMIES: ON              ", 1);
         txt_center(14, "UP/DOWN   A START   B BACK", 1);
         if (pressed & KEY_A) {
             new_game();
             level = st_sel;
             dev_run = 1;
+            boss_only = dev_boss;
             if (dev_max)
                 for (int i = 0; i < U_COUNT; i++) up_lv[i] = up_max[i];
             goto_scene(SC_CARD);
