@@ -1,0 +1,37 @@
+# hard mode: pick HARD, check boss HP and damage taken, then stats after the win
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+20 0 h_mode.ppm
+1 128
+1 0
+10 0 h_mode2.ppm
+1 1
+1 0
+30 0
+1 1
+1 0
+40 0 h_card.ppm
+1 1
+1 0
+1 0 @$hard
+300 0 h_walk.ppm
+1 0 !$cam=1810
+200 0 h_boss.ppm
+1 0 @$B+40,$B+44
+# take a hit on hard (2 instead of 1 from a little guy / 3 from a boss), then the title STATS entry from the save
+400 0
+1 0 @$R+20,$deaths
+^
+60 0
+1 8
+1 0
+1 128
+1 0
+5 0 h_title.ppm
+1 1
+1 0
+30 0 h_stats.ppm

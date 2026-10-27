@@ -5,6 +5,9 @@
 20 0 t_menu.ppm
 1 1
 1 0
+20 0 t_mode.ppm
+1 1
+1 0
 30 0 t_howto.ppm
 1 1
 1 0

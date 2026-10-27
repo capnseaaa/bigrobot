@@ -13,6 +13,9 @@ u32 squished;
 int plv, xp;
 int dev_run;                      // level select or dev menu used: do not overwrite the save
 u8 dev_sw[DV_COUNT];
+int hard;
+u32 play_frames;
+int bosses_beaten, deaths, worlds;
 
 static u16 oam_buf[512];
 static int oam_n;
@@ -282,7 +285,9 @@ static void load_static(void) {
 // ---------------------------------------------------------------- saving (SRAM)
 
 #define SAVE_MAGIC_V1 0x31524742u   // "BGR1" (v0.1.x: level, 7 upgrades, squished)
-#define SAVE_MAGIC 0x32524742u      // "BGR2" (adds the Power upgrade, player level and XP)
+#define SAVE_MAGIC_V2 0x32524742u   // "BGR2" (adds the Power upgrade, player level and XP)
+#define SAVE_MAGIC 0x33524742u      // "BGR3" (adds hard mode and the run stats)
+#define SAVE_SIZE 32
 
 static void sram_write(int off, const u8* src, int n) {
     for (int i = 0; i < n; i++) SRAM[off + i] = src[i];
@@ -292,10 +297,15 @@ static void sram_read(int off, u8* dst, int n) {
     for (int i = 0; i < n; i++) dst[i] = SRAM[off + i];
 }
 
-// v2 layout: magic(4) level(1) upgrades(8) plv(1) xp(2) squished(4)
+static void put32(u8* b, u32 v) { for (int i = 0; i < 4; i++) b[i] = v >> (8 * i); }
+static u32 get32(const u8* b) { return b[0] | (b[1] << 8) | (b[2] << 16) | ((u32)b[3] << 24); }
+
+// v3 layout: magic(4) level(1) upgrades(8) plv(1) xp(2) squished(4)
+//            hard(1) frames(4) bosses(2) deaths(2) worlds(2)   (v2 stops after squished)
 void save_game(void) {
     if (dev_run) return;
-    u8 b[20];
+    u8 b[SAVE_SIZE];
+    for (int i = 0; i < SAVE_SIZE; i++) b[i] = 0;
     u32 m = SAVE_MAGIC;
     for (int i = 0; i < 4; i++) b[i] = m >> (8 * i);
     b[4] = level;
@@ -303,26 +313,34 @@ void save_game(void) {
     b[13] = plv;
     b[14] = xp;
     b[15] = xp >> 8;
-    for (int i = 0; i < 4; i++) b[16 + i] = squished >> (8 * i);
-    sram_write(0, b, 20);
+    put32(b + 16, squished);
+    b[20] = hard;
+    put32(b + 21, play_frames);
+    b[25] = bosses_beaten; b[26] = bosses_beaten >> 8;
+    b[27] = deaths; b[28] = deaths >> 8;
+    b[29] = worlds; b[30] = worlds >> 8;
+    sram_write(0, b, SAVE_SIZE);
     save_level = level;
 }
 
-static u32 save_magic(const u8* b) { return b[0] | (b[1] << 8) | (b[2] << 16) | ((u32)b[3] << 24); }
+static u32 save_magic(const u8* b) { return get32(b); }
 
 static void load_save(void) {
     u8 b[20];
     sram_read(0, b, 20);
     u32 m = save_magic(b);
-    save_level = ((m == SAVE_MAGIC || m == SAVE_MAGIC_V1) && b[4] >= 1 && b[4] <= LAST_LEVEL) ? b[4] : 0;
+    save_level = ((m == SAVE_MAGIC || m == SAVE_MAGIC_V2 || m == SAVE_MAGIC_V1) && b[4] >= 1 && b[4] <= LAST_LEVEL) ? b[4] : 0;
 }
 
 static const u8 up_max[U_COUNT] = { 3, 3, 3, 3, 6, 3, 2, 5 };
 
 static void continue_game(void) {
-    u8 b[20];
-    sram_read(0, b, 20);
+    u8 b[SAVE_SIZE];
+    sram_read(0, b, SAVE_SIZE);
     level = b[4];
+    hard = 0;
+    play_frames = 0;
+    bosses_beaten = deaths = worlds = 0;
     if (save_magic(b) == SAVE_MAGIC_V1) {
         // old save: 7 upgrades, then squished at byte 12; no Power, player level or XP yet
         for (int i = 0; i < U_COUNT; i++) up_lv[i] = i < 7 ? b[5 + i] : 0;
@@ -332,7 +350,14 @@ static void continue_game(void) {
         for (int i = 0; i < U_COUNT; i++) up_lv[i] = b[5 + i];
         plv = b[13];
         xp = b[14] | (b[15] << 8);
-        squished = b[16] | (b[17] << 8) | (b[18] << 16) | ((u32)b[19] << 24);
+        squished = get32(b + 16);
+        if (save_magic(b) == SAVE_MAGIC) {
+            hard = b[20] & 1;
+            play_frames = get32(b + 21);
+            bosses_beaten = b[25] | (b[26] << 8);
+            deaths = b[27] | (b[28] << 8);
+            worlds = b[29] | (b[30] << 8);
+        }
     }
     for (int i = 0; i < U_COUNT; i++)
         if (up_lv[i] > up_max[i]) up_lv[i] = up_max[i];
@@ -347,6 +372,9 @@ static void new_game(void) {
     for (int i = 0; i < U_COUNT; i++) up_lv[i] = 0;
     squished = 0;
     plv = xp = 0;
+    hard = 0;
+    play_frames = 0;
+    bosses_beaten = deaths = worlds = 0;
     dev_run = 0;
     for (int i = 0; i < DV_COUNT; i++) dev_sw[i] = 0;
 }
@@ -434,7 +462,45 @@ static void title_text(void) {
         num_str(b + 13, save_level);
         txt(9, 18, st_sel == 1 ? ">" : " ", 0);
         txt(11, 18, b, st_sel == 1 ? 0 : 1);
+        txt(9, 19, st_sel == 2 ? ">" : " ", 0);
+        txt(11, 19, "STATS", st_sel == 2 ? 0 : 1);
     }
+}
+
+static void stat_line(int y, const char* name, const char* val) {
+    txt(4, y, name, 1);
+    txt(19, y, val, 0);
+}
+
+static void stats_screen(void) {
+    char b[16];
+    video_text();
+    txt_big_center(1, "STATS");
+    txt_center(3, hard ? "HARD MODE" : "NORMAL MODE", 1);
+    num_str(b, level);
+    stat_line(5, "LEVEL", b);
+    u32 s = play_frames / 60;
+    int h = s / 3600, mi = (s / 60) % 60, se = s % 60;
+    num_str(b, h);
+    int n = 0;
+    while (b[n]) n++;
+    b[n++] = ':';
+    b[n++] = '0' + mi / 10; b[n++] = '0' + mi % 10;
+    b[n++] = ':';
+    b[n++] = '0' + se / 10; b[n++] = '0' + se % 10;
+    b[n] = 0;
+    stat_line(7, "TIME", b);
+    num_str(b, squished);
+    stat_line(9, "SQUISHED", b);
+    num_str(b, bosses_beaten);
+    stat_line(11, "BOSSES BEATEN", b);
+    num_str(b, plv + 1);
+    stat_line(13, "PLAYER LEVEL", b);
+    num_str(b, deaths);
+    stat_line(15, "ROBOT DOWNS", b);
+    num_str(b, worlds);
+    stat_line(17, "WORLDS ENDED", b);
+    txt_center(19, "PRESS START", 0);
 }
 
 void goto_scene(int s) {
@@ -474,6 +540,7 @@ void goto_scene(int s) {
             txt_big_center(6, b);
             txt_center(10, theme_names[(level - 1) / 3 < THEME_COUNT ? (level - 1) / 3 : THEME_COUNT - 1], 0);
         }
+        if (hard) txt_center(15, "HARD MODE", 1);
         break;
     }
     case SC_PLAY:
@@ -501,6 +568,14 @@ void goto_scene(int s) {
     case SC_WIN:
         video_screen(SCR_WIN);
         music(SONG_WIN);
+        save_game();   // keep the finished run's stats
+        break;
+    case SC_MODE:
+        video_text();
+        txt_big_center(2, "PICK A MODE");
+        break;
+    case SC_STATS:
+        stats_screen();
         break;
     case SC_DEV:
         video_text();
@@ -526,7 +601,7 @@ static void scene_update(void) {
             }
         } else {
             if ((pressed & (KEY_UP | KEY_DOWN)) && save_level) {
-                st_sel ^= 1;
+                st_sel = (st_sel + ((pressed & KEY_UP) ? 2 : 1)) % 3;
                 sfx(SFX_SELECT);
                 title_text();
             }
@@ -535,9 +610,11 @@ static void scene_update(void) {
                 if (st_sel == 1) {
                     continue_game();
                     goto_scene(SC_CARD);
+                } else if (st_sel == 2) {
+                    continue_game();
+                    goto_scene(SC_STATS);
                 } else {
-                    new_game();
-                    goto_scene(SC_HOWTO);
+                    goto_scene(SC_MODE);
                 }
                 return;
             }
@@ -550,7 +627,33 @@ static void scene_update(void) {
     case SC_CARD:
         if (st_t > 150 || (st_t > 20 && (pressed & (KEY_A | KEY_START)))) goto_scene(SC_PLAY);
         break;
+    case SC_MODE:
+        if (st_t == 1 || (pressed & (KEY_UP | KEY_DOWN))) {
+            if (st_t > 1) { st_sel ^= 1; sfx(SFX_SELECT); }
+            txt_clear_rows(6, 17);
+            txt(5, 7, st_sel == 0 ? ">" : " ", 0);
+            txt(7, 7, "NORMAL", st_sel == 0 ? 0 : 1);
+            txt(9, 9, "THE GAME AS IT IS", 1);
+            txt(5, 12, st_sel == 1 ? ">" : " ", 0);
+            txt(7, 12, "HARD", st_sel == 1 ? 0 : 1);
+            txt(9, 14, "TOUGHER BOSSES,", 1);
+            txt(9, 15, "MORE ENEMIES,", 1);
+            txt(9, 16, "HITS HURT MORE", 1);
+            txt_center(18, "UP/DOWN PICK   A GO", 1);
+        }
+        if (st_t > 10 && (pressed & (KEY_A | KEY_START))) {
+            new_game();
+            hard = st_sel;
+            sfx(SFX_SELECT);
+            goto_scene(SC_HOWTO);
+        }
+        if (pressed & KEY_B) goto_scene(SC_TITLE);
+        break;
+    case SC_STATS:
+        if (st_t > 30 && (pressed & (KEY_START | KEY_A | KEY_B))) goto_scene(SC_TITLE);
+        break;
     case SC_PLAY: {
+        play_frames++;
         int ev = play_update();
         if (ev == EV_CLEAR) goto_scene(SC_UPGRADE);
         else if (ev == EV_DEAD) goto_scene(SC_GAMEOVER);
@@ -588,8 +691,13 @@ static void scene_update(void) {
             txt(7, 18, "START OVER", st_sel == 1 ? 2 : 3);
         }
         if (st_t > 61 && (pressed & (KEY_A | KEY_START))) {
-            if (st_sel == 1) new_game();
-            else level = 1;
+            if (st_sel == 1) {
+                // start over keeps the mode and the count of worlds ended
+                int h = hard, w = worlds;
+                new_game();
+                hard = h;
+                worlds = w;
+            } else level = 1;
             sfx(SFX_SELECT);
             goto_scene(SC_CARD);
         }
@@ -602,7 +710,7 @@ static void scene_update(void) {
     case SC_WIN:
         txt_clear_rows(18, 18);
         if (st_t > 90 && ((st_t >> 5) & 1)) txt_center(18, "THE END   PRESS START", 0);
-        if (st_t > 90 && (pressed & KEY_START)) goto_scene(SC_TITLE);
+        if (st_t > 90 && (pressed & KEY_START)) goto_scene(SC_STATS);
         break;
     case SC_DEV: {
         if (pressed & KEY_UP) st_sel = st_sel % LAST_LEVEL + 1;

@@ -227,6 +227,7 @@ static void enemy_box(Enemy* e, int* x0, int* y0, int* x1, int* y1) {
 
 static void hurt(int n) {
     if (R.inv || R.st == RS_DEAD || phase == PH_BOOM || phase == PH_CLEAR || dev_sw[DV_GOD]) return;
+    if (hard) n += (n + 1) / 2;
     R.hp -= n;
     R.inv = 60;
     R.hurt_t = 12;
@@ -236,6 +237,7 @@ static void hurt(int n) {
         R.hp = 0;
         R.st = RS_DEAD;
         R.t = 0;
+        deaths++;
         phase = PH_DEAD;
         phase_t = 0;
     }
@@ -264,6 +266,7 @@ static void boss_start(int id) {
     if (B.mega) B.maxhp = 700;
     else if (level == LAST_LEVEL) B.maxhp = (60 + 13 * (id + 1)) / 2;
     else B.maxhp = 60 + 13 * level;
+    if (hard) B.maxhp += B.maxhp / 2;
     B.hp = B.maxhp;
     B.cd = 60;
     B.stun = 0;
@@ -294,6 +297,7 @@ static void boss_damage(int n) {
         B.vx = B.vy = 0;
         sfx(SFX_BIGBOOM);
         gain_xp(B.mega ? 20 : 10);
+        bosses_beaten++;
     }
 }
 
@@ -519,6 +523,7 @@ static void boss_update(void) {
         if (done) {
             B.st = BS_MOVE;
             B.cd = B.mega ? 30 + rndr(30) : imax(40, 90 - level * 3) + rndr(40);
+            if (hard) B.cd = B.cd * 2 / 3;
         }
         break;
     }
@@ -773,6 +778,7 @@ static void do_clap(void) {
 static void world_boom(Enemy* e) {
     phase = PH_BOOM;
     boom_t = 0;
+    worlds++;
     e->hit = 1;
     music(SONG_NONE);
     sfx(SFX_BIGBOOM);
@@ -1613,15 +1619,16 @@ int play_update(void) {
         int target = (R.x >> 8) - 100;
         if (target > cam) cam = imin(target, level_len);
         if (!dev_sw[DV_NOENEMY] && --spawn_t <= 0) {
-            int maxn = imin(10, 3 + level / 2);
+            int maxn = imin(hard ? 12 : 10, 3 + level / 2 + (hard ? 3 : 0));
             if (live_enemies() < maxn && cam < level_len - 120) {
                 enemy_spawn(cam + 252, rndr(100) < 35);
             }
             spawn_t = imax(28, 75 - level * 3) + rndr(40);
+            if (hard) spawn_t = spawn_t * 2 / 3;
         }
         if (cam >= next_heart) {
             pickup_add(PK_HEART, cam + 190 + rndr(30), -16, LANE_TOP + rndr(LANE_BOT - LANE_TOP));
-            next_heart += 450;
+            next_heart += hard ? 650 : 450;
         }
         if (cam >= level_len) {
             phase = PH_WARN;

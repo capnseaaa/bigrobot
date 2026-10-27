@@ -48,6 +48,9 @@ enum { DV_NOENEMY, DV_GOD, DV_ONEHIT, DV_NOCOOL, DV_SAFEEYE, DV_FAST, DV_COUNT }
 extern u8 dev_sw[DV_COUNT];
 extern int dev_run;        // no saving for this run
 void max_upgrades(void);
+extern int hard;           // hard mode for this run
+extern u32 play_frames;    // run stats, saved with the game
+extern int bosses_beaten, deaths, worlds;
 extern int plv, xp;        // player level and experience toward the next one
 int xp_need(void);
 void save_game(void);
@@ -58,7 +61,7 @@ void pick_upgrades(void);
 void draw_upgrade_choices(int y0, int sel, int panel);
 int take_upgrade(int sel);
 
-enum { SC_TITLE, SC_HOWTO, SC_CARD, SC_PLAY, SC_UPGRADE, SC_LAVA, SC_GAMEOVER, SC_WIN, SC_DEV };
+enum { SC_TITLE, SC_HOWTO, SC_CARD, SC_PLAY, SC_UPGRADE, SC_LAVA, SC_GAMEOVER, SC_WIN, SC_DEV, SC_MODE, SC_STATS };
 void goto_scene(int s);
 
 // ---- play.c: the level itself
