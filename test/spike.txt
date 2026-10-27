@@ -1,8 +1,5 @@
 # level 4 via level select: Spike Guy shoots spikes; then power cycle and CONTINUE
 60 0
-1 8
-1 0
-10 0
 1 772
 1 0
 1 64
@@ -28,9 +25,6 @@
 60 0 s_f.ppm
 ^
 60 0
-1 8
-1 0
-10 0
 1 8
 1 0
 20 0 s_continue.ppm

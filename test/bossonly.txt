@@ -1,8 +1,5 @@
 # dev switch: level select with R (enemies off) -> straight to each boss, carries to level 2
 60 0
-1 8
-1 0
-10 0
 1 772
 1 0
 1 256

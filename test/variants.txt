@@ -1,8 +1,5 @@
 # enemy variants on level 8: shields, spikes, heavies; hints; bolts bounce off shields
 60 0
-1 8
-1 0
-10 0
 1 772
 1 0
 1 64

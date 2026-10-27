@@ -1,8 +1,5 @@
 # stats: final level via level select, beat the Mega Robot, stats screen after THE END; title STATS entry
 60 0
-1 8
-1 0
-10 0
 1 772
 1 0
 1 128

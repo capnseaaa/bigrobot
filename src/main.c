@@ -471,18 +471,23 @@ static void draw_upgrades(void) {
 
 // ---------------------------------------------------------------- scenes
 
+// the title menu sits on a centered dark panel (columns 5..24), one blank row between entries
 static void title_text(void) {
-    txt_clear_rows(16, 19);
+    txt_clear_rows(12, 19);
     if (st_sel < 0) return;
-    txt(9, 17, st_sel == 0 ? ">" : " ", 0);
-    txt(11, 17, "NEW GAME", st_sel == 0 ? 0 : 1);
+    int y0 = save_level ? 12 : 16, y1 = 18;
+    for (int y = y0; y <= y1; y++)
+        for (int x = 5; x <= 24; x++) put_tile(x, y, y == y0 ? HUD_PANEL_TOP : y == y1 ? HUD_PANEL_BOT : HUD_PANEL);
+    int y = y0 + 1;
+    txt(7, y, st_sel == 0 ? ">" : " ", 2);
+    txt(9, y, "NEW GAME", st_sel == 0 ? 2 : 3);
     if (save_level) {
         char b[20] = "CONTINUE  LV ";
         num_str(b + 13, save_level);
-        txt(9, 18, st_sel == 1 ? ">" : " ", 0);
-        txt(11, 18, b, st_sel == 1 ? 0 : 1);
-        txt(9, 19, st_sel == 2 ? ">" : " ", 0);
-        txt(11, 19, "STATS", st_sel == 2 ? 0 : 1);
+        txt(7, y + 2, st_sel == 1 ? ">" : " ", 2);
+        txt(9, y + 2, b, st_sel == 1 ? 2 : 3);
+        txt(7, y + 4, st_sel == 2 ? ">" : " ", 2);
+        txt(9, y + 4, "STATS", st_sel == 2 ? 2 : 3);
     }
 }
 
@@ -537,16 +542,16 @@ void goto_scene(int s) {
         break;
     case SC_HOWTO:
         video_text();
+        // a centered two-column block (columns 5..24): buttons at column 5, what they do at column 14
         txt_big_center(1, "HOW TO PLAY");
-        txt(3, 4, "D-PAD", 0);  txt(11, 4, "MOVE (YOU MARCH RIGHT)", 1);
-        txt(3, 6, "A", 0);      txt(11, 6, "STOMP", 1);
-        txt(3, 8, "B", 0);      txt(11, 8, "HAND LASERS", 1);
-        txt(3, 10, "R", 0);     txt(11, 10, "EYE LASERS", 1);
-        txt(3, 12, "L", 0);     txt(11, 12, "SLAM", 1);
-        txt(3, 14, "L + R", 0); txt(11, 14, "THUNDERCLAP", 1);
-        txt_center(16, "EYE LASERS ARE FOR BOSSES.", 0);
-        txt_center(17, "DO NOT ZAP THE LITTLE GUYS...", 1);
-        txt_center(19, "PRESS A", 0);
+        txt(5, 4, "D-PAD", 0); txt(14, 4, "MOVE", 1);
+        txt(5, 6, "A", 0); txt(14, 6, "STOMP", 1);
+        txt(5, 8, "B", 0); txt(14, 8, "HAND LASERS", 1);
+        txt(5, 10, "R", 0); txt(14, 10, "EYE LASERS", 1);
+        txt(5, 12, "L", 0); txt(14, 12, "SLAM", 1);
+        txt(5, 14, "L + R", 0); txt(14, 14, "THUNDERCLAP", 1);
+        txt_center(16, "EYE LASERS: BOSSES ONLY!", 0);
+        txt_center(18, "PRESS A", 1);
         break;
     case SC_CARD: {
         video_text();
@@ -656,21 +661,18 @@ static void scene_update(void) {
         if (st_t == 1 || (pressed & (KEY_UP | KEY_DOWN))) {
             if (st_t > 1) { st_sel ^= 1; sfx(SFX_SELECT); }
             txt_clear_rows(6, 17);
-            txt(5, 7, st_sel == 0 ? ">" : " ", 0);
-            txt(7, 7, "NORMAL", st_sel == 0 ? 0 : 1);
-            txt(9, 9, "THE GAME AS IT IS", 1);
-            txt(5, 12, st_sel == 1 ? ">" : " ", 0);
-            txt(7, 12, "HARD", st_sel == 1 ? 0 : 1);
-            txt(9, 14, "TOUGHER BOSSES,", 1);
-            txt(9, 15, "MORE ENEMIES,", 1);
-            txt(9, 16, "HITS HURT MORE", 1);
+            // everything centered; the picked mode gets arrows on both sides
+            txt_center(7, st_sel == 0 ? "> NORMAL <" : "  NORMAL  ", st_sel == 0 ? 0 : 1);
+            txt_center(9, "THE GAME AS IT IS", 1);
+            txt_center(12, st_sel == 1 ? "> HARD <" : "  HARD  ", st_sel == 1 ? 0 : 1);
+            txt_center(14, "TOUGHER AND MORE ENEMIES", 1);
             txt_center(18, "UP/DOWN PICK   A GO", 1);
         }
         if (st_t > 10 && (pressed & (KEY_A | KEY_START))) {
             new_game();
             hard = st_sel;
             sfx(SFX_SELECT);
-            goto_scene(SC_HOWTO);
+            goto_scene(SC_INTRO);   // a new save starts with the story
         }
         if (pressed & KEY_B) goto_scene(SC_TITLE);
         break;
@@ -708,12 +710,13 @@ static void scene_update(void) {
         }
         if (st_t == 61 || (st_t > 61 && (pressed & (KEY_UP | KEY_DOWN)))) {
             if (st_t > 61) { st_sel ^= 1; sfx(SFX_SELECT); }
+            // a centered panel (columns 4..25) with the choices as a centered block (columns 6..23)
             for (int y = 15; y <= 19; y++)
-                for (int x = 3; x <= 26; x++) put_tile(x, y, y == 15 ? HUD_PANEL_TOP : y == 19 ? HUD_PANEL_BOT : HUD_PANEL);
-            txt(5, 16, st_sel == 0 ? ">" : " ", 2);
-            txt(7, 16, "KEEP UPGRADES, LEVEL 1", st_sel == 0 ? 2 : 3);
-            txt(5, 18, st_sel == 1 ? ">" : " ", 2);
-            txt(7, 18, "START OVER", st_sel == 1 ? 2 : 3);
+                for (int x = 4; x <= 25; x++) put_tile(x, y, y == 15 ? HUD_PANEL_TOP : y == 19 ? HUD_PANEL_BOT : HUD_PANEL);
+            txt(6, 16, st_sel == 0 ? ">" : " ", 2);
+            txt(8, 16, "KEEP MY UPGRADES", st_sel == 0 ? 2 : 3);
+            txt(6, 18, st_sel == 1 ? ">" : " ", 2);
+            txt(8, 18, "START OVER", st_sel == 1 ? 2 : 3);
         }
         if (st_t > 61 && (pressed & (KEY_A | KEY_START))) {
             if (st_sel == 1) {
@@ -736,7 +739,7 @@ static void scene_update(void) {
         if (ending_update()) goto_scene(SC_STATS);
         break;
     case SC_INTRO:
-        if (intro_update()) goto_scene(SC_TITLE);
+        if (intro_update()) goto_scene(SC_HOWTO);
         break;
     case SC_DEV: {
         if (pressed & KEY_UP) st_sel = st_sel % LAST_LEVEL + 1;
@@ -747,9 +750,10 @@ static void scene_update(void) {
         num_str(b + 6, st_sel);
         txt_clear_rows(6, 16);
         txt_big_center(7, b);
-        txt_center(11, dev_max ? "L  UPGRADES: ALL MAXED" : "L  UPGRADES: NONE     ", 1);
-        txt_center(12, dev_boss ? "R  ENEMIES: OFF, BOSSES ONLY" : "R  ENEMIES: ON              ", 1);
-        txt_center(14, "UP/DOWN   A START   B BACK", 1);
+        // one left-aligned block, centered (columns 6..23)
+        txt(6, 11, dev_max ? "L  UPGRADES: MAXED" : "L  UPGRADES: NONE ", 1);
+        txt(6, 13, dev_boss ? "R  ENEMIES:  OFF  " : "R  ENEMIES:  ON   ", 1);
+        txt_center(16, "UP/DOWN   A START   B BACK", 1);
         if (pressed & KEY_A) {
             new_game();
             level = st_sel;
@@ -775,7 +779,7 @@ int main(void) {
     snd_init();
     load_save();
     (void)*(volatile const char*)save_tag;
-    goto_scene(SC_INTRO);
+    goto_scene(SC_TITLE);
     for (;;) {
         vsync();
         vblank_work();

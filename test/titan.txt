@@ -1,8 +1,5 @@
 # boss moves on level 14 with bosses only and god mode
 60 0
-1 8
-1 0
-10 0
 1 772
 1 0
 1 256

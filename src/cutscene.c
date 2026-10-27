@@ -317,13 +317,8 @@ static void intro_shot(void) {
     }
 }
 
-// returns 1 when the intro is over (or skipped)
+// returns 1 when the intro is over (it plays all the way through)
 int intro_update(void) {
-    if (pressed & (KEY_START | KEY_A)) {
-        fade(0, 0);
-        robot_lights(1);
-        return 1;
-    }
     cs_t++;
     shot_t++;
     intro_shot();

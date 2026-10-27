@@ -5,7 +5,7 @@ A heavy-metal robot smash-'em-up for the Game Boy Advance, played in emulators (
 You are a huge, cool gray, slightly angry robot in black sunglasses. March through 21 levels, squish the little armored guys, and beat a boss at the end of every level. On level 21 there are no little guys: six of the toughest bosses come back one after another, and then the Mega Robot.
 
 ## Story
-The game opens with an intro (skip it with START or A). The world is burning and the people call for the Big Giant Robot. Asteroids hit the Earth, and the bad guys and the Mega Robot came with them. Then the robot, hooked up to the power lines, switches on: its eyes light up red, it nods its sunglasses down, and they sparkle. Beat the Mega Robot and the ending plays: the Mega Robot goes down behind the city, the robot walks in, the crowd cheers, and there are fireworks. Then the stats.
+Every new save starts with an intro (it can't be skipped). The world is burning and the people call for the Big Giant Robot. Asteroids hit the Earth, and the bad guys and the Mega Robot came with them. Then the robot, hooked up to the power lines, switches on: its eyes light up red, it nods its sunglasses down, and they sparkle. Beat the Mega Robot and the ending plays: the Mega Robot goes down behind the city, the robot walks in, the crowd cheers, and there are fireworks. Then the stats.
 
 ## Controls
 | Button | What it does |
@@ -18,7 +18,7 @@ The game opens with an intro (skip it with START or A). The world is burning and
 | L + R | Thunderclap: stuns every enemy (no damage). Only 2 per level (more with upgrades) |
 | START | Pause (SELECT in the pause menu turns the music on or off) |
 
-**Eye lasers are for bosses** (they do the real damage to them). If they hit one of the little guys, the whole world explodes and turns into a lava field. Then pick KEEP UPGRADES (back to level 1 with your upgrades) or START OVER.
+**Eye lasers are for bosses** (they do the real damage to them). If they hit one of the little guys, the whole world explodes and turns into a lava field. Then pick KEEP MY UPGRADES (back to level 1 with your upgrades) or START OVER.
 
 ## Game
 - The little guys look like War Machine suits in six colors (gunmetal, red, gold, blue, green, purple). All colors have the same stats. They walk or fly toward you from the right, but never higher than half the robot's height.

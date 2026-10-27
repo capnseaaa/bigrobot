@@ -1,6 +1,19 @@
-# intro: every shot, then the title
+# a new save plays the intro (A and START do not skip it), then the how-to screen
+60 0 i_boot.ppm
+1 8
+1 0
+20 0
+1 1
+1 0
+20 0
+1 1
+1 0
 60 0 i_city0.ppm
-70 0 i_city1.ppm
+1 8
+1 0
+1 1
+1 0
+66 0 i_city1.ppm
 100 0 i_city2.ppm
 90 0 i_sky0.ppm
 100 0 i_sky1.ppm
@@ -15,4 +28,4 @@
 20 0 i_pow4.ppm
 8 0 i_pow5.ppm
 50 0 i_pow6.ppm
-100 0 i_title.ppm
+200 0 i_howto.ppm
