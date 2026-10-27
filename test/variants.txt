@@ -1,0 +1,31 @@
+# enemy variants on level 8: shields, spikes, heavies; hints; bolts bounce off shields
+60 0
+1 772
+1 0
+1 64
+1 0
+1 64
+1 0
+1 64
+1 0
+1 64
+1 0
+1 64
+1 0
+1 64
+1 0
+1 64
+1 0
+5 0 v_sel.ppm
+1 1
+1 0
+40 0
+1 1
+1 0
+200 0 v_1.ppm
+150 2 v_2.ppm
+150 0 v_3.ppm
+100 2 v_4.ppm
+1 0 @$R+20
+100 1 v_5.ppm
+200 512 v_6.ppm

@@ -2,24 +2,26 @@
 
 A heavy-metal robot smash-'em-up for the Game Boy Advance, played in emulators (built for the R36 Ultra handheld).
 
-You are a huge, cool gray, slightly angry robot in black sunglasses. March through 21 levels, squish the little armored guys, and beat a boss at the end of every level. On level 21 there are no little guys: all 20 bosses come back one after another, and then the Mega Robot.
+You are a huge, cool gray, slightly angry robot in black sunglasses. March through 21 levels, squish the little armored guys, and beat a boss at the end of every level. On level 21 there are no little guys: six of the toughest bosses come back one after another, and then the Mega Robot.
 
 ## Controls
 | Button | What it does |
 |---|---|
 | D-pad | The robot marches right on its own. RIGHT = faster, LEFT = stop, UP/DOWN = move on the street |
 | A | Stomp (squishes the little guys in front of you) |
-| B | Blue hand lasers (aim at the nearest enemy in front) |
+| B | Blue hand lasers: short range, aim at the nearest enemy in front, only scratch bosses |
 | R | Red eye lasers: he lifts his sunglasses and fires from his eyes |
 | L | Slam: jump up and smash the ground |
 | L + R | Thunderclap: stuns every enemy (no damage). Only 2 per level (more with upgrades) |
 | START | Pause (SELECT in the pause menu turns the music on or off) |
 
-**Eye lasers are for bosses.** If they hit one of the little guys, the whole world explodes and turns into a lava field. Then pick KEEP UPGRADES (back to level 1 with your upgrades) or START OVER.
+**Eye lasers are for bosses** (they do the real damage to them). If they hit one of the little guys, the whole world explodes and turns into a lava field. Then pick KEEP UPGRADES (back to level 1 with your upgrades) or START OVER.
 
 ## Game
 - The little guys look like War Machine suits in six colors (gunmetal, red, gold, blue, green, purple). All colors have the same stats. They walk or fly toward you from the right, but never higher than half the robot's height.
-- Every level ends with a boss about 80% of the robot's size: Iron Mauler, Sawblade, Blaze Horn, Spike Guy (he shoots spikes), Volt Skull, Rocket Raven, Chrome Crusher, Magma Maw, Frost Fang, Venom Vat, Doom Drill, Grim Reaper, Heavy Metal, Steel Titan, Blizzard Beast, Neon Ninja, Scrap King, Cyclops, Dragon-X, Inferno King.
+- Some little guys need a certain move. SHIELD guys (from level 2): lasers bounce off, so stomp or slam them (a thunderclap drops their shields). SPIKE guys (from level 4): stomping them hurts you, so laser them. HEAVIES (from level 7): only a slam takes them down. The little guys get tougher and come in bigger groups as the levels go on.
+- Every level ends with a boss about 80% of the robot's size. Each has four attacks, from shots, spreads, lobs, rain from the sky, charges and jumps to shockwaves down your lane (change lanes), triple charges, warping behind you and calling in backup. Below half health a boss goes into RAGE MODE: red, faster, harder. The bosses: Iron Mauler, Sawblade, Blaze Horn, Spike Guy (he shoots spikes), Volt Skull, Rocket Raven, Chrome Crusher, Magma Maw, Frost Fang, Venom Vat, Doom Drill, Grim Reaper, Heavy Metal, Steel Titan, Blizzard Beast, Neon Ninja, Scrap King, Cyclops, Dragon-X, Inferno King.
+- The Mega Robot has three phases: at 2/3 health it calls in backup and gets angry, at 1/3 its armor goes up and only eye lasers hurt it.
 - Health hearts drop from the sky as you march and from beaten enemies. Bosses drop a big health cell. You start every level at full health.
 - After every boss, pick one of three upgrades: Hand Lasers, Eye Lasers, Stomp, Slam, Armor, Thunderclap, Speed, Power (+25% boss damage).
 - Every enemy you beat gives XP. A full XP bar pauses the game: LEVEL UP! and you pick another upgrade.
@@ -37,6 +39,6 @@ Needs `arm-none-eabi-gcc` and Python 3 with Pillow.
 sh bigrobot/build.sh          # -> bigrobot/bigrobot.gba
 ```
 
-Tests need `libmgba`: `sh bigrobot/test/run.sh test/play.txt` plays a scripted run and saves screenshots (also `boss.txt`, `boom.txt`, `clear.txt`, `final.txt`, `dead.txt`, `spike.txt`, `new.txt`, `walk.txt`, `bossonly.txt`, `devmenu.txt`, `devmenu2.txt`, `hard.txt`, `stats.txt`; `migrate.txt` loads an old save given in `HARNESS_SAV`).
+Tests need `libmgba`: `sh bigrobot/test/run.sh test/play.txt` plays a scripted run and saves screenshots (also `boss.txt`, `boom.txt`, `clear.txt`, `final.txt`, `dead.txt`, `spike.txt`, `new.txt`, `walk.txt`, `bossonly.txt`, `devmenu.txt`, `devmenu2.txt`, `hard.txt`, `stats.txt`, `variants.txt`, `ninja.txt`, `titan.txt`, `mega.txt`; `migrate.txt` loads an old save given in `HARNESS_SAV`).
 
 No external GBA libraries. All art (robot, enemies, bosses, backgrounds, the metal font, the title and lava screens) is drawn in code by `tools/make_art.py`; previews land in `art/`.

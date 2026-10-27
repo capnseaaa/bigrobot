@@ -12,7 +12,8 @@ void video_play(int theme);
 // sprite VRAM (4bpp tile numbers) and OBJ palette banks
 enum { T_ROBOT = 0, T_GLASS = 96, T_BOSS = 100, T_ENEMY = 356, T_FX = 404 };
 #define T_PROJ (T_FX + FX_TILE_COUNT)
-enum { PAL_ROBOT, PAL_BOSS, PAL_ENEMY, PAL_FX = 8, PAL_PROJ, PAL_WHITE, PAL_STUN };
+#define T_VAR (T_PROJ + PROJ_TILE_COUNT)
+enum { PAL_ROBOT, PAL_BOSS, PAL_ENEMY, PAL_FX = 8, PAL_PROJ, PAL_WHITE, PAL_STUN, PAL_VAR };
 
 // sprite shapes/sizes
 #define SQ 0
@@ -41,10 +42,16 @@ static struct {
 } R;
 static int shown_frame;
 
-#define MAX_EN 12
+#define MAX_EN 16
 enum { ES_OFF, ES_LIVE, ES_SQUISH, ES_FLEE };
+// kinds: the plain trooper, then the variants that need a certain move
+//   shield: lasers bounce off unless stunned (stomp or slam it)
+//   spike:  stomping it hurts you and a slam only stuns it (laser it)
+//   heavy:  stomps bounce off, lasers barely scratch it (slam it)
+enum { EK_TROOP, EK_SHIELD, EK_SPIKE, EK_HEAVY };
 typedef struct {
-    u8 st, fly, suit, hit;
+    u8 st, fly, suit, hit, kind, fl;
+    int hp;
     int x, y, gy, spd, keep, t, stun, cd, anim, hover, shoot;
 } Enemy;
 static Enemy en[MAX_EN];
@@ -73,51 +80,59 @@ typedef struct {
 } Pickup;
 static Pickup pk[MAX_PK];
 
-enum { A_SHOT, A_FAN, A_LOB, A_RAIN, A_CHARGE, A_JUMP, A_BEAM };
+enum { A_SHOT, A_FAN, A_LOB, A_RAIN, A_CHARGE, A_JUMP, A_BEAM, A_QUAKE, A_SUMMON, A_TRIPLE, A_WARP };
+//   QUAKE: three shockwaves along your lane (change lanes or slam-jump over them)
+//   SUMMON: calls in troopers (careful with the eye lasers!)
+//   TRIPLE: charges back and forth three times
+//   WARP: vanishes, reappears behind you and charges
 typedef struct {
-    u8 atk[3];
+    u8 atk[4];
     u8 proj, beam, speed;
 } BossDef;
 static const BossDef bdef[BOSS_COUNT + 1] = {
-    { { A_CHARGE, A_SHOT, A_CHARGE }, PJ_RIVET, PJ_RIVET, 2 },   // IRON MAULER
-    { { A_SHOT, A_CHARGE, A_FAN }, PJ_SAW, PJ_SAW, 3 },          // SAWBLADE
-    { { A_BEAM, A_LOB, A_SHOT }, PJ_FIRE, PJ_FIRE, 2 },          // BLAZE HORN
-    { { A_FAN, A_RAIN, A_SHOT }, PJ_SPIKE, PJ_SPIKE, 2 },        // SPIKE GUY
-    { { A_SHOT, A_RAIN, A_FAN }, PJ_ELEC, PJ_ELEC, 3 },          // VOLT SKULL
-    { { A_LOB, A_SHOT, A_JUMP }, PJ_MISSILE, PJ_FIRE, 3 },       // ROCKET RAVEN
-    { { A_JUMP, A_CHARGE, A_SHOT }, PJ_ROCK, PJ_ROCK, 2 },       // CHROME CRUSHER
-    { { A_LOB, A_BEAM, A_RAIN }, PJ_FIRE, PJ_FIRE, 2 },          // MAGMA MAW
-    { { A_FAN, A_SHOT, A_CHARGE }, PJ_ICE, PJ_ICE, 3 },          // FROST FANG
-    { { A_LOB, A_RAIN, A_SHOT }, PJ_ACID, PJ_ACID, 2 },          // VENOM VAT
-    { { A_CHARGE, A_JUMP, A_FAN }, PJ_ROCK, PJ_ROCK, 3 },        // DOOM DRILL
-    { { A_SHOT, A_CHARGE, A_RAIN }, PJ_SCYTHE, PJ_SCYTHE, 3 },   // GRIM REAPER
-    { { A_FAN, A_BEAM, A_SHOT }, PJ_NOTE, PJ_SOUND, 3 },         // HEAVY METAL
-    { { A_CHARGE, A_JUMP, A_FAN }, PJ_RIVET, PJ_RIVET, 3 },      // STEEL TITAN
-    { { A_FAN, A_RAIN, A_CHARGE }, PJ_ICE, PJ_ICE, 1 },          // BLIZZARD BEAST
-    { { A_SHOT, A_CHARGE, A_JUMP }, PJ_SHURIKEN, PJ_SHURIKEN, 3 }, // NEON NINJA
-    { { A_LOB, A_RAIN, A_SHOT }, PJ_ROCK, PJ_ROCK, 1 },          // SCRAP KING
-    { { A_SHOT, A_BEAM, A_FAN }, PJ_LASER, PJ_LASER, 2 },        // CYCLOPS
-    { { A_BEAM, A_LOB, A_JUMP }, PJ_FIRE, PJ_FIRE, 2 },          // DRAGON-X
-    { { A_JUMP, A_CHARGE, A_RAIN }, PJ_FIRE, PJ_FIRE, 2 },       // INFERNO KING
-    { { A_FAN, A_RAIN, A_JUMP }, PJ_MISSILE, PJ_FIRE, 3 },       // MEGA ROBOT
+    { { A_CHARGE, A_SHOT, A_QUAKE, A_CHARGE }, PJ_RIVET, PJ_RIVET, 2 },      // IRON MAULER
+    { { A_SHOT, A_TRIPLE, A_FAN, A_CHARGE }, PJ_SAW, PJ_SAW, 3 },            // SAWBLADE
+    { { A_BEAM, A_LOB, A_CHARGE, A_QUAKE }, PJ_FIRE, PJ_FIRE, 2 },           // BLAZE HORN
+    { { A_FAN, A_RAIN, A_SHOT, A_FAN }, PJ_SPIKE, PJ_SPIKE, 2 },             // SPIKE GUY
+    { { A_SHOT, A_RAIN, A_WARP, A_FAN }, PJ_ELEC, PJ_ELEC, 3 },              // VOLT SKULL
+    { { A_LOB, A_JUMP, A_SHOT, A_RAIN }, PJ_MISSILE, PJ_FIRE, 3 },           // ROCKET RAVEN
+    { { A_JUMP, A_QUAKE, A_CHARGE, A_JUMP }, PJ_ROCK, PJ_ROCK, 2 },          // CHROME CRUSHER
+    { { A_LOB, A_BEAM, A_RAIN, A_QUAKE }, PJ_FIRE, PJ_FIRE, 2 },             // MAGMA MAW
+    { { A_FAN, A_TRIPLE, A_SHOT, A_SUMMON }, PJ_ICE, PJ_ICE, 3 },            // FROST FANG
+    { { A_LOB, A_RAIN, A_SUMMON, A_SHOT }, PJ_ACID, PJ_ACID, 2 },            // VENOM VAT
+    { { A_TRIPLE, A_JUMP, A_QUAKE, A_FAN }, PJ_ROCK, PJ_ROCK, 3 },           // DOOM DRILL
+    { { A_WARP, A_SHOT, A_RAIN, A_WARP }, PJ_SCYTHE, PJ_SCYTHE, 3 },         // GRIM REAPER
+    { { A_FAN, A_BEAM, A_QUAKE, A_SUMMON }, PJ_NOTE, PJ_SOUND, 3 },          // HEAVY METAL
+    { { A_CHARGE, A_JUMP, A_QUAKE, A_TRIPLE }, PJ_RIVET, PJ_RIVET, 3 },      // STEEL TITAN
+    { { A_FAN, A_RAIN, A_QUAKE, A_JUMP }, PJ_ICE, PJ_ICE, 1 },               // BLIZZARD BEAST
+    { { A_WARP, A_SHOT, A_WARP, A_TRIPLE }, PJ_SHURIKEN, PJ_SHURIKEN, 3 },   // NEON NINJA
+    { { A_LOB, A_SUMMON, A_RAIN, A_QUAKE }, PJ_ROCK, PJ_ROCK, 1 },           // SCRAP KING
+    { { A_BEAM, A_SHOT, A_FAN, A_BEAM }, PJ_LASER, PJ_LASER, 2 },            // CYCLOPS
+    { { A_BEAM, A_LOB, A_JUMP, A_RAIN }, PJ_FIRE, PJ_FIRE, 2 },              // DRAGON-X
+    { { A_JUMP, A_CHARGE, A_QUAKE, A_TRIPLE }, PJ_FIRE, PJ_FIRE, 2 },        // INFERNO KING
+    { { A_FAN, A_RAIN, A_JUMP, A_SHOT }, PJ_MISSILE, PJ_FIRE, 3 },           // MEGA ROBOT
 };
+
+// level 21: six of the toughest bosses, then the Mega Robot
+#define RUSH_N 6
+static const u8 rush_ids[RUSH_N] = { 3, 11, 13, 15, 17, 19 };
 
 enum { BS_ENTER, BS_MOVE, BS_TELE, BS_ATK, BS_DIE };
 static struct {
     int on, id, mega, st, t, x, y, gy, vx, vy, face, hp, maxhp, cd, stun, flash, atk, atk_i, frame, shown;
-    int air;
+    int air, n, hide, rage, phase;   // phase: the Mega Robot's 1..3 (3 = armored: only eye lasers hurt it)
 } B;
 
 // upgrade tables (index = upgrade level)
 static const u8 hand_cd[4] = { 14, 14, 9, 9 };
 static const u8 hand_n[4] = { 1, 2, 2, 3 };
-static const u8 eye_dmg[4] = { 2, 3, 3, 4 };
+static const u8 eye_dmg[4] = { 4, 5, 6, 7 };
 static const u8 eye_cool[4] = { 110, 100, 60, 60 };
 static const u8 eye_len[4] = { 48, 48, 48, 64 };
 static const u8 stomp_w[4] = { 32, 44, 56, 70 };
-static const u8 stomp_dmg[4] = { 5, 7, 9, 12 };
+static const u8 stomp_dmg[4] = { 8, 11, 14, 18 };
 static const u8 slam_r[4] = { 80, 100, 120, 150 };
-static const u8 slam_dmg[4] = { 10, 13, 16, 20 };
+static const u8 slam_dmg[4] = { 16, 20, 25, 32 };
 static const u8 slam_cool[4] = { 150, 150, 100, 80 };
 static const u16 walk_spd[3] = { 320, 384, 448 };
 
@@ -219,9 +234,10 @@ static void boss_box(int* x0, int* y0, int* x1, int* y1) {
 
 static void enemy_box(Enemy* e, int* x0, int* y0, int* x1, int* y1) {
     int x = e->x >> 8, y = e->y >> 8;
-    *x0 = x - 7;
-    *x1 = x + 7;
-    *y0 = y - (e->fly ? 21 : 23);
+    int w = e->kind == EK_TROOP ? 7 : e->kind == EK_SPIKE ? 9 : 11;
+    *x0 = x - w;
+    *x1 = x + w;
+    *y0 = y - (e->fly ? 21 : e->kind == EK_HEAVY ? 30 : 23);
     *y1 = y;
 }
 
@@ -263,9 +279,9 @@ static void boss_start(int id) {
     B.y = F8(B.gy);
     B.vx = B.vy = 0;
     B.face = -1;
-    if (B.mega) B.maxhp = 700;
-    else if (level == LAST_LEVEL) B.maxhp = (60 + 13 * (id + 1)) / 2;
-    else B.maxhp = 60 + 13 * level;
+    if (B.mega) B.maxhp = 1200;
+    else if (level == LAST_LEVEL) B.maxhp = (150 + 25 * (id + 1)) * 6 / 10;
+    else B.maxhp = 150 + 25 * level;
     if (hard) B.maxhp += B.maxhp / 2;
     B.hp = B.maxhp;
     B.cd = 60;
@@ -273,6 +289,8 @@ static void boss_start(int id) {
     B.flash = 0;
     B.atk_i = 0;
     B.air = 0;
+    B.n = B.hide = B.rage = 0;
+    B.phase = 1;
     B.frame = 0;
     B.shown = -1;
     const u16* p = B.mega ? mega_pal : &boss_pals[id * 16];
@@ -280,23 +298,60 @@ static void boss_start(int id) {
     boss_frame_upload();
 }
 
+// rage: the boss's colors go hot red
+static void boss_tint(void) {
+    const u16* p = B.mega ? mega_pal : &boss_pals[B.id * 16];
+    for (int i = 1; i < 16; i++) {
+        int c = p[i], r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31;
+        r = imin(31, r + 10);
+        g = g * 2 / 3;
+        b = b / 2;
+        OBJ_PAL[16 + i] = r | (g << 5) | (b << 10);
+    }
+}
+
+// boss attack strength: grows with the level
+static int boss_hit(void) { return B.mega ? 8 : 3 + level / 4; }
+
 static void gain_xp(int n) {
     if (level == LAST_LEVEL && plv > 40) return;
     xp += n;
 }
 
-static void boss_damage(int n) {
-    if (!B.on || B.st == BS_DIE || B.st == BS_ENTER) return;
+static void boss_damage(int n, int eye) {
+    if (!B.on || B.st == BS_DIE || B.st == BS_ENTER || B.hide) return;
+    if (B.mega && B.phase == 3 && !eye && !dev_sw[DV_ONEHIT]) {
+        int x0, y0, x1, y1;
+        boss_box(&x0, &y0, &x1, &y1);
+        fx_add(K_SPARK, x0 + rndr(x1 - x0) - 8, y0 + rndr(y1 - y0) - 8, 0);   // the armor shrugs it off
+        return;
+    }
     n = dev_sw[DV_ONEHIT] ? B.hp : n * (4 + up_lv[U_POWER]) / 4;
     B.hp -= n;
     B.flash = 4;
+    if (B.hp > 0 && !B.rage && B.hp * 2 < B.maxhp) {
+        B.rage = 1;
+        boss_tint();
+        set_banner(0, B.mega ? "THE MEGA ROBOT IS ANGRY!" : "RAGE MODE!", 90);
+        sfx(SFX_WARN);
+    }
+    if (B.mega && B.hp > 0) {
+        int ph = B.hp * 3 > B.maxhp * 2 ? 1 : B.hp * 3 > B.maxhp ? 2 : 3;
+        if (ph != B.phase) {
+            B.phase = ph;
+            if (ph == 2) { set_banner("PHASE 2", "IT CALLS FOR BACKUP!", 120); boss_tint(); }
+            if (ph == 3) set_banner("ARMOR UP!", "ONLY EYE LASERS HURT IT NOW", 160);
+            sfx(SFX_WARN);
+            shake(20, 4);
+        }
+    }
     if (B.hp <= 0) {
         B.hp = 0;
         B.st = BS_DIE;
         B.t = 0;
         B.vx = B.vy = 0;
         sfx(SFX_BIGBOOM);
-        gain_xp(B.mega ? 20 : 10);
+        gain_xp(B.mega ? 12 : 6);
         bosses_beaten++;
     }
 }
@@ -317,18 +372,27 @@ static void boss_proj(int x, int y, int vx, int vy, int kind, int grav, int life
 static const s16 fan_c[7] = { 197, 222, 247, 256, 247, 222, 197 };
 static const s16 fan_s[7] = { -165, -128, -66, 0, 66, 128, 165 };
 
+static int live_enemies(void);
+static void enemy_spawn(int x, int fly);
+
 static void boss_attack_start(void) {
     const BossDef* d = &bdef[B.mega ? MEGA_ID : B.id];
     if (B.mega) {
-        static const u8 cyc[7] = { A_FAN, A_SHOT, A_RAIN, A_CHARGE, A_LOB, A_JUMP, A_BEAM };
-        B.atk = cyc[B.atk_i % 7];
+        static const u8 cyc[3][6] = {
+            { A_FAN, A_SHOT, A_CHARGE, A_LOB, A_JUMP, A_SHOT },
+            { A_QUAKE, A_FAN, A_SUMMON, A_RAIN, A_WARP, A_SHOT },
+            { A_TRIPLE, A_RAIN, A_QUAKE, A_FAN, A_WARP, A_BEAM },
+        };
+        B.atk = cyc[B.phase - 1][B.atk_i % 6];
     } else {
-        B.atk = d->atk[B.atk_i % 3];
+        B.atk = d->atk[B.atk_i % 4];
     }
+    if (B.atk == A_SUMMON && live_enemies() >= 4) B.atk = A_SHOT;
     B.atk_i++;
     B.st = BS_TELE;
-    B.t = (B.atk == A_CHARGE) ? 34 : (B.atk == A_JUMP) ? 18 : 26;
-    if (level >= 10 && B.t > 18) B.t -= 6;
+    B.n = 0;
+    B.t = (B.atk == A_CHARGE || B.atk == A_TRIPLE) ? 30 : (B.atk == A_JUMP || B.atk == A_WARP) ? 16 : 24;
+    if ((level >= 10 || B.rage) && B.t > 16) B.t -= 6;
     sfx(SFX_WARN);
 }
 
@@ -392,7 +456,7 @@ static void boss_update(void) {
                     s->gy = B.gy;
                     s->vx = dir * 3 * 256;
                     s->life = 45;
-                    s->dmg = 2;
+                    s->dmg = boss_hit();
                 }
             }
             if (B.st == BS_ATK) {
@@ -407,7 +471,7 @@ static void boss_update(void) {
         return;
     }
     int dx = rx - bx;
-    if (B.st != BS_ATK || B.atk != A_CHARGE) B.face = dx >= 0 ? 1 : -1;
+    if (B.st != BS_ATK || (B.atk != A_CHARGE && B.atk != A_TRIPLE)) B.face = dx >= 0 ? 1 : -1;
     int speed = 72 + d->speed * 26;   // side to side: about 0.4 to 0.6 px per frame
     switch (B.st) {
     case BS_MOVE: {
@@ -444,35 +508,35 @@ static void boss_update(void) {
         B.frame = 2;
         switch (B.atk) {
         case A_SHOT: {
-            int n = 1 + (level >= 6) + (level >= 11) + B.mega;
+            int n = 2 + (level >= 6) + (level >= 11) + B.mega + B.rage;
             if (t % 12 == 0 && t / 12 < n) {
                 int vx, vy;
-                aim(hand_x, hand_y, rx, (R.y >> 8) - 45, B.mega ? 900 : 760, &vx, &vy);
-                boss_proj(hand_x, hand_y, vx, vy, B.mega ? PJ_MISSILE : d->proj, 0, 200, 2);
+                aim(hand_x, hand_y, rx, (R.y >> 8) - 45, (B.mega ? 900 : 760) + B.rage * 160, &vx, &vy);
+                boss_proj(hand_x, hand_y, vx, vy, B.mega ? PJ_MISSILE : d->proj, 0, 200, boss_hit());
                 sfx(SFX_HIT);
             }
             done = t >= n * 12 + 8;
             break;
         }
         case A_FAN:
-            if (t == 0 || (B.mega && t == 20)) {
+            if (t == 0 || ((B.mega || B.rage) && t == 20)) {
                 int vx, vy;
-                aim(hand_x, hand_y, rx, (R.y >> 8) - 40, 620, &vx, &vy);
+                aim(hand_x, hand_y, rx, (R.y >> 8) - 40, 620 + B.rage * 140, &vx, &vy);
                 int lo2 = (level >= 10 || B.mega) ? 0 : 1, hi2 = (level >= 10 || B.mega) ? 7 : 6;
                 for (int k = lo2; k < hi2; k++) {
                     int c = fan_c[k], s = fan_s[k];
                     boss_proj(hand_x, hand_y, (vx * c - vy * s) >> 8, (vx * s + vy * c) >> 8,
-                              B.mega ? PJ_SPIKE : d->proj, 0, 200, 2);
+                              B.mega ? PJ_SPIKE : d->proj, 0, 200, boss_hit());
                 }
                 sfx(SFX_HIT);
             }
-            done = t >= (B.mega ? 40 : 22);
+            done = t >= ((B.mega || B.rage) ? 40 : 22);
             break;
         case A_LOB:
             if (t == 0 || t == 15 || t == 30) {
                 int tx = rx + (t == 0 ? 0 : t == 15 ? -30 : 30);
                 int vx = idiv((tx - hand_x) * 256, 50);
-                boss_proj(hand_x, hand_y - 6, vx, -1000, B.mega ? PJ_MISSILE : d->proj, 40, 200, 2);
+                boss_proj(hand_x, hand_y - 6, vx, -1000, B.mega ? PJ_MISSILE : d->proj, 40, 200, boss_hit());
                 for (int q = 0; q < MAX_SHOT; q++)
                     if (sh[q].on && sh[q].own == OWN_BOSS && sh[q].t == 0 && sh[q].grav) sh[q].gy = R.gy;
                 sfx(SFX_HIT);
@@ -511,10 +575,73 @@ static void boss_update(void) {
             done = 0;   // ends when it lands (see above)
             if (t > 200) done = 1;
             break;
+        case A_QUAKE:
+            if (t == 0 || t == 18 || t == 36) {
+                int dir = rx >= bx ? 1 : -1;
+                Shot* s = shot_new(OWN_WAVE);
+                if (s) {
+                    s->x = B.x + dir * F8(B.mega ? 30 : 16);
+                    s->y = F8(R.gy);
+                    s->gy = R.gy;   // aimed down your lane
+                    s->vx = dir * (B.rage ? 4 : 3) * 256;
+                    s->life = 80;
+                    s->dmg = boss_hit();
+                }
+                shake(10, 3);
+                sfx(SFX_SLAM);
+                B.frame = 1;
+            }
+            done = t >= 50;
+            break;
+        case A_SUMMON:
+            if (t == 10 || t == 25 || (t == 40 && (level >= 10 || B.mega))) {
+                enemy_spawn(cam + 250, rndr(2));
+                sfx(SFX_WARN);
+            }
+            done = t >= 50;
+            break;
+        case A_TRIPLE: {
+            if (t == 0) {
+                B.face = rx >= bx ? 1 : -1;
+                B.vx = B.face * (B.mega ? 4 : 3) * 256 + B.face * B.rage * 96;
+                sfx(SFX_SLAM);
+            }
+            B.x += B.vx;
+            B.frame = (t >> 2) & 1 ? 2 : 1;
+            if ((t & 7) == 0) fx_add(K_DUST, bx - 16 - B.face * 20, B.gy - 16, 0);
+            int passed = (B.vx > 0 && bx > rx + 60) || (B.vx < 0 && bx < rx - 60);
+            if (passed || (B.vx < 0 && bx <= lo) || (B.vx > 0 && bx >= hi) || t > 90) {
+                if (++B.n >= 3) { B.vx = 0; done = 1; }
+                else B.t = 0;   // turn around and go again
+            }
+            break;
+        }
+        case A_WARP:
+            B.hide = t < 34;
+            if (t == 16) {
+                // reappear behind the robot, in its lane
+                int side = (rx - cam) < 120 ? 1 : -1;
+                int nx = rx + side * 80;
+                if (nx < lo) nx = lo;
+                if (nx > hi) nx = hi;
+                B.x = F8(nx);
+                B.gy = R.gy;
+                B.y = F8(B.gy);
+                sfx(SFX_CLAP);
+            }
+            if (t == 34) {
+                B.hide = 0;
+                B.atk = A_CHARGE;
+                B.t = 0;
+                B.face = rx >= (B.x >> 8) ? 1 : -1;
+                B.vx = B.face * (B.mega ? 4 : 3) * 256;
+                sfx(SFX_SLAM);
+            }
+            break;
         case A_BEAM:
             if (t < 48 && (t & 3) == 0) {
                 int vy = (rndr(5) - 2) * 40;
-                boss_proj(hand_x, hand_y + 4, B.face * 900, vy, d->beam, 0, 30, 1);
+                boss_proj(hand_x, hand_y + 4, B.face * 900, vy, d->beam, 0, 30, 2 + level / 8);
                 if ((t & 7) == 0) sfx(SFX_HIT);
             }
             done = t >= 52;
@@ -522,8 +649,10 @@ static void boss_update(void) {
         }
         if (done) {
             B.st = BS_MOVE;
-            B.cd = B.mega ? 30 + rndr(30) : imax(40, 90 - level * 3) + rndr(40);
+            B.cd = B.mega ? 24 + rndr(24) : imax(24, 60 - level * 2) + rndr(25);
             if (hard) B.cd = B.cd * 2 / 3;
+            if (B.rage) B.cd = B.cd * 2 / 3;
+            B.hide = 0;
         }
         break;
     }
@@ -534,11 +663,25 @@ static void boss_update(void) {
     int x0, y0, x1, y1, a0, b0, a1, b1;
     boss_box(&x0, &y0, &x1, &y1);
     robot_box(&a0, &b0, &a1, &b1);
-    if (near_lane(B.gy, R.gy, 12) && boxes(x0 + 6, y0 + 6, x1 - 6, y1, a0, b0, a1, b1)) hurt(B.st == BS_ATK && B.atk == A_CHARGE ? 3 : 2);
+    int charging = B.st == BS_ATK && (B.atk == A_CHARGE || B.atk == A_TRIPLE);
+    if (!B.hide && near_lane(B.gy, R.gy, 12) && boxes(x0 + 6, y0 + 6, x1 - 6, y1, a0, b0, a1, b1))
+        hurt(charging ? boss_hit() * 3 / 2 + 2 : boss_hit());
     boss_frame_upload();
 }
 
 // ---------------------------------------------------------------- enemies
+
+// the first variants of each kind in their first levels: tell the player what works
+static u8 hinted[4];
+static void variant_hint(int kind) {
+    static const u8 first[4] = { 0, 2, 4, 7 };
+    static const char* const big[4] = { 0, "SHIELDS!", "SPIKES!", "HEAVIES!" };
+    static const char* const how[4] = { 0, "LASERS BOUNCE OFF: STOMP THEM", "NO STOMPING: LASER THEM", "ONLY A SLAM (L) WORKS" };
+    if (kind == EK_TROOP || hinted[kind] || level < first[kind] || level > first[kind] + 2) return;
+    hinted[kind] = 1;
+    set_banner(big[kind], how[kind], 170);
+    sfx(SFX_WARN);
+}
 
 static void enemy_spawn(int x, int fly) {
     for (int i = 0; i < MAX_EN; i++)
@@ -547,6 +690,15 @@ static void enemy_spawn(int x, int fly) {
             e->st = ES_LIVE;
             e->fly = fly;
             e->suit = rndr(ENEMY_SUITS);
+            e->kind = EK_TROOP;
+            if (!fly) {
+                int r = rndr(100);
+                if (level >= 7 && r < 14) e->kind = EK_HEAVY;
+                else if (level >= 4 && r >= 14 && r < 34) e->kind = EK_SPIKE;
+                else if (level >= 2 && r >= 34 && r < 54) e->kind = EK_SHIELD;
+            }
+            e->hp = e->kind == EK_HEAVY ? 12 + level : e->kind == EK_SPIKE ? 2 + level / 5 : 1 + level / 6;
+            e->fl = 0;
             e->x = F8(x);
             e->gy = LANE_TOP + rndr(LANE_BOT - LANE_TOP + 1);
             e->y = F8(fly ? e->gy - 12 : e->gy);
@@ -559,6 +711,8 @@ static void enemy_spawn(int x, int fly) {
             e->shoot = 0;
             e->hit = 0;
             e->t = 0;
+            if (e->kind == EK_HEAVY) e->spd = 60 + rndr(30);
+            variant_hint(e->kind);
             return;
         }
 }
@@ -576,7 +730,7 @@ static void enemy_kill(Enemy* e, int squish) {
     }
     squished++;
     level_squish++;
-    gain_xp(1);
+    gain_xp(e->kind == EK_TROOP ? 1 : 2);
     if (rndr(100) < 12) pickup_add(PK_HEART, e->x >> 8, (e->y >> 8) - 20, e->gy);
 }
 
@@ -606,6 +760,7 @@ static void enemies_update(void) {
             continue;
         }
         if (e->shoot) e->shoot--;
+        if (e->fl) e->fl--;
         if (e->stun) {
             e->stun--;
             continue;
@@ -632,22 +787,24 @@ static void enemies_update(void) {
             continue;
         }
         if (--e->cd <= 0) {
-            e->cd = imax(50, 110 + rndr(80) - level * 4);
+            e->cd = imax(40, 100 + rndr(70) - level * 4);
             if (ex > rx + 20 && ex < cam + 244) {
                 Shot* s = shot_new(OWN_BULLET);
                 if (s) {
                     int sx = ex + (dx > 0 ? 7 : -7), sy = (e->y >> 8) - 18;
                     s->x = F8(sx);
                     s->y = F8(sy);
-                    aim(sx, sy, rx, (R.y >> 8) - 46, 600, &s->vx, &s->vy);
+                    aim(sx, sy, rx, (R.y >> 8) - 46, 600 + level * 12, &s->vx, &s->vy);
                     s->life = 160;
+                    s->dmg = 1 + level / 6 + (e->kind == EK_HEAVY);
                     e->shoot = 12;
                 }
             }
         }
         int x0, y0, x1, y1;
         enemy_box(e, &x0, &y0, &x1, &y1);
-        if (near_lane(e->gy, R.gy, 8) && boxes(x0, y0, x1, y1, a0 + 4, b0, a1 - 4, b1)) hurt(1);
+        if (near_lane(e->gy, R.gy, 8) && boxes(x0, y0, x1, y1, a0 + 4, b0, a1 - 4, b1))
+            hurt(1 + level / 7 + (e->kind == EK_SPIKE) + (e->kind == EK_HEAVY) * 2);
     }
 }
 
@@ -677,7 +834,7 @@ static void fire_bolts(void) {
         Enemy* e = &en[i];
         if (e->st != ES_LIVE) continue;
         int dx = (e->x >> 8) - hx;
-        if (dx * R.face <= 4 || iabs(dx) > 220) continue;
+        if (dx * R.face <= 4 || iabs(dx) > 110) continue;
         if (iabs(dx) < best) {
             best = iabs(dx);
             tx = e->x >> 8;
@@ -686,7 +843,7 @@ static void fire_bolts(void) {
     }
     if (B.on && B.st != BS_DIE && B.st != BS_ENTER) {
         int dx = (B.x >> 8) - hx;
-        if (dx * R.face > 0 && iabs(dx) < best) {
+        if (dx * R.face > 0 && iabs(dx) < best && iabs(dx) < 130) {
             best = iabs(dx);
             tx = B.x >> 8;
             ty = (B.y >> 8) - (B.mega ? 60 : 36);
@@ -704,8 +861,8 @@ static void fire_bolts(void) {
         s->y = F8(hy - 2 + (n == 2 ? (k ? 3 : -3) : 0));
         s->vx = vx;
         s->vy = vy + spread[n - 1][k];
-        s->life = 80;
-        s->dmg = up_lv[U_HAND] >= 3 ? 3 : 2;
+        s->life = 20;   // about 130 px: the hand lasers are short range
+        s->dmg = up_lv[U_HAND] >= 3 ? 2 : 1;
     }
     fx_add(K_FLASH, hx - 8, hy - 8, 0);
     sfx(SFX_LASER);
@@ -723,12 +880,22 @@ static void do_stomp(void) {
         int ex = e->x >> 8;
         int low = (e->y >> 8) >= e->gy - (up_lv[U_STOMP] >= 2 ? 20 : 10);
         int lane = near_lane(e->gy, R.gy, up_lv[U_STOMP] >= 2 ? 14 : 10);
-        if (ex >= z0 && ex <= z1 && low && lane) enemy_kill(e, !e->fly);
+        if (!(ex >= z0 && ex <= z1 && low && lane)) continue;
+        if (e->kind == EK_SPIKE) {
+            hurt(2 + level / 6);   // ouch: spikes
+            fx_add(K_SPARK, ex - 8, e->gy - 20, 0);
+        } else if (e->kind == EK_HEAVY) {
+            e->stun = imax(e->stun, 40);
+            e->fl = 6;
+            fx_add(K_SPARK, ex - 8, e->gy - 26, 0);
+        } else {
+            enemy_kill(e, !e->fly);
+        }
     }
     if (B.on && !B.air && near_lane(B.gy, R.gy, 14)) {
         int x0, y0, x1, y1;
         boss_box(&x0, &y0, &x1, &y1);
-        if (z1 >= x0 && z0 <= x1) boss_damage(stomp_dmg[up_lv[U_STOMP]]);
+        if (z1 >= x0 && z0 <= x1) boss_damage(stomp_dmg[up_lv[U_STOMP]], 0);
     }
     fx_add(K_DUST, (R.face > 0 ? rx + 16 : rx - 16) - 16, R.gy - 16, 0);
     if (up_lv[U_STOMP] >= 2) {
@@ -746,12 +913,15 @@ static void do_slam(void) {
         Enemy* e = &en[i];
         if (e->st != ES_LIVE) continue;
         int ex = e->x >> 8;
-        if (iabs(ex - rx) <= r && (e->y >> 8) >= e->gy - 22 && near_lane(e->gy, R.gy, 18)) enemy_kill(e, !e->fly);
+        if (iabs(ex - rx) <= r && (e->y >> 8) >= e->gy - 22 && near_lane(e->gy, R.gy, 18)) {
+            if (e->kind == EK_SPIKE) e->stun = imax(e->stun, 90);
+            else enemy_kill(e, !e->fly);
+        }
     }
     if (B.on && !B.air && near_lane(B.gy, R.gy, 20)) {
         int x0, y0, x1, y1;
         boss_box(&x0, &y0, &x1, &y1);
-        if (rx + r >= x0 && rx - r <= x1) boss_damage(slam_dmg[up_lv[U_SLAM]]);
+        if (rx + r >= x0 && rx - r <= x1) boss_damage(slam_dmg[up_lv[U_SLAM]], 0);
     }
     for (int k = 0; k < 3; k++) {
         fx_add(K_DUST, rx + 4 + k * 10, R.gy - 16, 3 + k);
@@ -830,7 +1000,7 @@ static void beam_update(void) {
         }
     }
     if (dboss >= 0 && (R.t & 2) == 0 && (R.t & 1)) {
-        boss_damage(eye_dmg[up_lv[U_EYE]]);
+        boss_damage(eye_dmg[up_lv[U_EYE]], 1);
         if ((R.t & 7) == 1) fx_add(K_POP, ex + R.face * dboss - 8, ey + dboss / 2 - 8, 0);
     }
 }
@@ -1019,7 +1189,7 @@ static void shots_update(void) {
                 s->vy = 4 * 256;
                 s->vx = 0;
                 s->life = 80;
-                s->dmg = 2;
+                s->dmg = 3 + level / 4;
             }
             continue;
         }
@@ -1039,8 +1209,15 @@ static void shots_update(void) {
                 int x0, y0, x1, y1;
                 enemy_box(e, &x0, &y0, &x1, &y1);
                 if (x >= x0 - 3 && x <= x1 + 3 && y >= y0 - 3 && y <= y1 + 3) {
-                    enemy_kill(e, 0);
                     s->on = 0;
+                    if (e->kind == EK_SHIELD && !e->stun) {
+                        fx_add(K_SPARK, x - 8, y - 8, 0);   // bounces off the shield
+                        break;
+                    }
+                    e->hp -= up_lv[U_HAND] >= 3 ? 2 : 1;
+                    e->fl = 6;
+                    if (e->hp <= 0) enemy_kill(e, 0);
+                    else fx_add(K_POP, x - 8, y - 8, 0);
                     break;
                 }
             }
@@ -1048,7 +1225,7 @@ static void shots_update(void) {
                 int x0, y0, x1, y1;
                 boss_box(&x0, &y0, &x1, &y1);
                 if (x >= x0 && x <= x1 && y >= y0 && y <= y1) {
-                    boss_damage(s->dmg);
+                    boss_damage(s->dmg, 0);
                     fx_add(K_POP, x - 8, y - 8, 0);
                     s->on = 0;
                 }
@@ -1147,6 +1324,7 @@ static void draw_boss(int sx0, int sy0) {
         int sx = (B.x >> 8) + sx0, sy = (B.y >> 8) + sy0;
         int hf = B.face < 0;
         int ox = hf ? sx - (w - cx) : sx - cx, oy = sy - (B.mega ? 127 : 95);
+        if (B.hide && (frame & 3)) return;
         int pal = B.flash ? PAL_WHITE : PAL_BOSS;
         if (B.st == BS_TELE && (B.t & 4)) pal = PAL_WHITE;
         if (B.stun) {
@@ -1173,13 +1351,19 @@ static void draw_enemies(int sx0, int sy0, int front) {
         else if (e->fly) f = (frame >> 2) & 1 ? EF_FLY1 : EF_FLY2;
         else f = (e->anim >> 3) & 1 ? EF_WALK1 : EF_WALK2;
         int hf = e->st == ES_FLEE ? (e->x >> 8) < rx : 1;
-        int pal = PAL_ENEMY + e->suit;
+        int pal = e->kind ? PAL_VAR + e->kind - 1 : PAL_ENEMY + e->suit;
         if (e->stun) {
-            pal = PAL_STUN;
-            spr(x - 4, y - 32 + ((frame >> 3) & 1), SQ, 0, T_FX + FX_STAR + ((frame >> 3) & 1), PAL_FX, 0, 0);
+            if (!e->kind) pal = PAL_STUN;
+            spr(x - 4, y - (e->kind == EK_HEAVY ? 38 : 32) + ((frame >> 3) & 1), SQ, 0, T_FX + FX_STAR + ((frame >> 3) & 1), PAL_FX, 0, 0);
         }
-        if (e->hit && (frame & 2)) pal = PAL_WHITE;
-        spr(x - 8, y - 32, TALL, 2, T_ENEMY + f * 8, pal, hf, 0);
+        if ((e->hit || e->fl) && (frame & 2)) pal = PAL_WHITE;
+        if (e->kind && e->st != ES_SQUISH) {
+            int vf = (e->anim >> 3) & 1;
+            if ((e->kind == EK_SHIELD && e->stun) || (e->kind != EK_SHIELD && e->shoot)) vf = 2;
+            spr(x - 16, y - 32, SQ, 2, T_VAR + ((e->kind - 1) * 3 + vf) * 16, pal, hf, 0);
+        } else {
+            spr(x - 8, y - 32, TALL, 2, T_ENEMY + f * 8, pal, hf, 0);
+        }
     }
 }
 
@@ -1398,7 +1582,7 @@ static int dev_update(void) {
     case DM_CLEAR:
         if (live) {
             B.on = 0;
-            rush_i = MEGA_ID;
+            rush_i = RUSH_N;
             phase = PH_BOSS;
             for (int i = 0; i < MAX_EN; i++)
                 if (en[i].st == ES_LIVE) en[i].st = ES_FLEE;
@@ -1508,6 +1692,7 @@ void play_enter(void) {
     level_squish = 0;
     lvlup = 0;
     dev_open = 0;
+    hinted[1] = hinted[2] = hinted[3] = 0;
     lightning_t = 0;
     for (int i = 0; i < MAX_WX; i++) {
         wx[i].x = rndr(240);
@@ -1517,6 +1702,7 @@ void play_enter(void) {
     upload((void*)(OBJ_TILES + T_ENEMY * 16), enemy_tiles, sizeof(enemy_tiles) / 4);
     upload((void*)(OBJ_TILES + T_FX * 16), fx_tiles, sizeof(fx_tiles) / 4);
     upload((void*)(OBJ_TILES + T_PROJ * 16), proj_tiles, sizeof(proj_tiles) / 4);
+    upload((void*)(OBJ_TILES + T_VAR * 16), variant_tiles, sizeof(variant_tiles) / 4);
     OBJ_PAL[9] = robot_pal[9];
     OBJ_PAL[10] = robot_pal[10];
     if (level == LAST_LEVEL) {
@@ -1619,11 +1805,12 @@ int play_update(void) {
         int target = (R.x >> 8) - 100;
         if (target > cam) cam = imin(target, level_len);
         if (!dev_sw[DV_NOENEMY] && --spawn_t <= 0) {
-            int maxn = imin(hard ? 12 : 10, 3 + level / 2 + (hard ? 3 : 0));
+            int maxn = imin(hard ? 16 : 14, 4 + level * 2 / 3 + (hard ? 3 : 0));
             if (live_enemies() < maxn && cam < level_len - 120) {
                 enemy_spawn(cam + 252, rndr(100) < 35);
+                if (level >= 5 && rndr(100) < 30) enemy_spawn(cam + 276, rndr(100) < 35);   // a pair
             }
-            spawn_t = imax(28, 75 - level * 3) + rndr(40);
+            spawn_t = imax(20, 62 - level * 2) + rndr(35);
             if (hard) spawn_t = spawn_t * 2 / 3;
         }
         if (cam >= next_heart) {
@@ -1645,11 +1832,14 @@ int play_update(void) {
         break;
     }
     case PH_WARN:
-        if (--phase_t <= 0) phase = PH_BOSS;
+        if (--phase_t <= 0) {
+            phase = PH_BOSS;
+            if (level <= 2) set_banner(0, "R: EYE LASERS FOR BOSSES!", 150);
+        }
         // fall through: the boss can already be beaten during the warning
     case PH_BOSS:
         if (!B.on) {
-            if (level == LAST_LEVEL && rush_i < MEGA_ID) {
+            if (level == LAST_LEVEL && rush_i < RUSH_N) {
                 rush_i++;
                 phase = PH_RUSHGAP;
                 phase_t = 110;
@@ -1674,10 +1864,11 @@ int play_update(void) {
         break;
     case PH_RUSHGAP:
         if (--phase_t <= 0) {
-            boss_start(rush_i);
+            int id = rush_i < RUSH_N ? rush_ids[rush_i] : MEGA_ID;
+            boss_start(id);
             phase = PH_WARN;
             phase_t = 90;
-            set_banner(rush_i == MEGA_ID ? "WARNING!" : "NEXT BOSS", boss_names[rush_i], 110);
+            set_banner(id == MEGA_ID ? "WARNING!" : "NEXT BOSS", boss_names[id], 110);
             sfx(SFX_WARN);
         }
         break;

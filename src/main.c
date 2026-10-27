@@ -272,6 +272,7 @@ static void load_static(void) {
     for (int i = 0; i < 6 * 16; i++) OBJ_PAL[32 + i] = enemy_pals[i];
     for (int i = 0; i < 16; i++) OBJ_PAL[8 * 16 + i] = fx_pal[i];
     for (int i = 0; i < 16; i++) OBJ_PAL[9 * 16 + i] = proj_pal[i];
+    for (int i = 0; i < 3 * 16; i++) OBJ_PAL[12 * 16 + i] = variant_pals[i];
     for (int i = 1; i < 16; i++) OBJ_PAL[10 * 16 + i] = RGB(31, 31, 31);
     // stunned enemies: a cold blue-gray version of the gunmetal suit
     for (int i = 1; i < 16; i++) {
@@ -379,7 +380,7 @@ static void new_game(void) {
     for (int i = 0; i < DV_COUNT; i++) dev_sw[i] = 0;
 }
 
-int xp_need(void) { return 6 + plv * 3; }
+int xp_need(void) { return 10 + plv * 5; }
 
 // ---------------------------------------------------------------- upgrades
 
@@ -534,8 +535,9 @@ void goto_scene(int s) {
         num_str(b + 6, level);
         if (level == LAST_LEVEL) {
             txt_big_center(6, "FINAL LEVEL");
-            txt_center(10, "ALL 20 BOSSES ARE BACK", 1);
-            txt_center(12, "THEN THE MEGA ROBOT!", 0);
+            txt_center(10, "SIX OF THE TOUGHEST BOSSES", 1);
+            txt_center(11, "ARE BACK", 1);
+            txt_center(13, "THEN THE MEGA ROBOT!", 0);
         } else {
             txt_big_center(6, b);
             txt_center(10, theme_names[(level - 1) / 3 < THEME_COUNT ? (level - 1) / 3 : THEME_COUNT - 1], 0);

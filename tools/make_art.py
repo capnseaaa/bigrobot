@@ -648,6 +648,96 @@ def build_enemies():
     img.resize((96 * 4, 192 * 4), Image.NEAREST).save(os.path.join(ART, "enemies.png"))
 
 
+# ---------------------------------------------------------------- enemy variants (32x32, need a certain move)
+# shield: lasers bounce off (stomp or slam it). spike: stomping hurts you (laser it). heavy: only a slam kills it.
+
+VARIANTS = [("shield", "#3c6e9c"), ("spike", "#a8285c"), ("heavy", "#8c7428")]
+VARIANT_FRAMES = ["walk1", "walk2", "alt"]
+
+
+def variant_frame(kind, f):
+    cv = Canvas(32, 32)
+    if kind == "heavy":
+        y = 0
+        legs = {"walk1": [((13, 21), (9, 29)), ((18, 21), (22, 29))],
+                "walk2": [((13, 21), (13, 29)), ((18, 21), (18, 29))],
+                "alt": [((13, 21), (11, 29)), ((18, 21), (20, 29))]}[f]
+        for (a, b) in legs:
+            part(cv, (2, 2, 3, 4), lambda m, a=a, b=b: m.capsule(a[0], a[1], b[0], b[1], 2.6, 1))
+        for (a, b) in legs:
+            part(cv, METAL, lambda m, b=b: m.rect(b[0] - 3, b[1], b[0] + 3, b[1] + 2, 1))
+        part(cv, (2, 2, 3, 4), lambda m: m.capsule(8, 13, 6, 21, 2.4, 1))       # back arm
+        part(cv, SUIT, lambda m: m.rect(8, 10, 22, 22, 1))                       # big torso
+        part(cv, SUIT, lambda m: m.ellipse(8, 11, 3.5, 3, 1))
+        part(cv, SUIT, lambda m: m.ellipse(21, 11, 3.5, 3, 1))
+        cv.rect(12, 15, 18, 16, 6)
+        cv.rect(13, 15, 17, 15, 12)
+        cv.rect(11, 19, 19, 19, 2)
+        part(cv, SUIT, lambda m: m.rect(11, 2, 19, 10, 1))                       # helmet
+        cv.rect(14, 4, 19, 8, 8)
+        cv.rect(14, 6, 19, 6, 1)
+        cv.rect(15, 6, 19, 6, 9)
+        cv.rect(14, 8, 19, 8, 6)
+        # twin shoulder cannons
+        part(cv, METAL, lambda m: m.rect(16, 8, 30, 10, 1))
+        part(cv, METAL, lambda m: m.rect(4, 6, 12, 8, 1))
+        if f == "alt":
+            cv.px(31, 8, 11); cv.px(31, 9, 9); cv.px(30, 7, 10)
+        part(cv, (2, 3, 4, 5), lambda m: m.capsule(21, 14, 23, 20, 1.8, 1))     # front arm
+        part(cv, METAL, lambda m: m.ellipse(23, 21, 2, 2, 1))
+        return cv
+    body = enemy_frame("shoot" if f == "alt" and kind == "spike" else ("walk1" if f == "walk1" else "walk2"))
+    ox = 6 if kind == "shield" else 8
+    cv.paste(body, ox, 0)
+    if kind == "shield":
+        down = f == "alt"   # dropped while stunned
+        sy = 14 if down else 7
+        part(cv, METAL, lambda m: m.rect(20, sy, 27, sy + 21 - (6 if down else 0), 1))
+        part(cv, METAL, lambda m: m.ellipse(23.5, sy, 3.5, 2, 1))
+        x0 = 21
+        cv.rect(x0 + 1, sy + 3, x0 + 2, sy + 15 - (6 if down else 0), 12)
+        cv.px(x0 + 4, sy + 2, 4)
+        cv.px(x0 + 4, sy + 12 - (6 if down else 0), 4)
+    else:
+        # big spikes on the helmet, back, shoulder and knee
+        tips = [((13, 8), (11, 1)), ((16, 7), (17, 0)), ((19, 8), (23, 3)),
+                ((12, 16), (5, 13)), ((12, 20), (5, 22)), ((19, 15), (24, 11)), ((15, 25), (19, 27))]
+        for (bb, tt) in tips:
+            dx, dy = tt[0] - bb[0], tt[1] - bb[1]
+            l = math.hypot(dx, dy)
+            nx, ny = -dy / l * 2.2, dx / l * 2.2
+            part(cv, (6, 7, 8, 8), lambda m, bb=bb, tt=tt, nx=nx, ny=ny: m.poly(
+                [(bb[0] - nx, bb[1] - ny), (bb[0] + nx, bb[1] + ny), tt], 1))
+    return cv
+
+
+def build_variants():
+    words = []
+    frames = []
+    for k, c in VARIANTS:
+        for f in VARIANT_FRAMES:
+            cv = variant_frame(k, f)
+            frames.append((k, c, cv))
+            for t in tiles4(cv):
+                words.extend(pack4(t))
+    emit_u32("variant_tiles", words)
+    define("VARIANT_COUNT", len(VARIANTS))
+    define("VARIANT_FRAMES", len(VARIANT_FRAMES))
+    define("VARIANT_TILE_COUNT", len(words) // 8)
+    pals = []
+    for n, c in VARIANTS:
+        pals.extend([g15(x) for x in enemy_pal(c)] + [0] * (16 - len(enemy_pal(c))))
+    emit_u16("variant_pals", pals)
+    img = Image.new("RGB", (32 * 3, 32 * 3))
+    for i, (k, c, cv) in enumerate(frames):
+        pal = enemy_pal(c)
+        for y in range(32):
+            for x in range(32):
+                v = cv.p[y][x]
+                img.putpixel(((i % 3) * 32 + x, (i // 3) * 32 + y), pal[v] if v else (40, 0, 40))
+    img.resize((96 * 4, 96 * 4), Image.NEAREST).save(os.path.join(ART, "variants.png"))
+
+
 # ---------------------------------------------------------------- effects (lasers, booms, pickups)
 
 FX_PAL = [(0, 0, 0), H("#1a0a0a"), H("#8a0808"), H("#ff2a1a"), H("#ffd0c0"), H("#0a2aa0"), H("#2a7aff"),
@@ -2504,6 +2594,7 @@ def main():
     os.makedirs(ART, exist_ok=True)
     frames, anchors, gl = build_robot()
     build_enemies()
+    build_variants()
     build_fx()
     build_proj()
     build_bosses()
