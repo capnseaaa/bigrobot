@@ -1,0 +1,63 @@
+# dev menu is locked to level-select runs: normal game no, level-select run yes, CONTINUE after it no
+60 0
+1 8
+1 0
+20 0
+1 1
+1 0
+20 0
+1 1
+1 0
+200 0
+70 2
+30 0
+1 1
+1 0
+40 0
+1 1
+1 0
+100 0
+1 770
+10 0 l_normal.ppm
+1 0 @$dev_open,$dev_run
+# level-select run: the menu opens
+60 0
+^
+60 0
+1 772
+1 0
+10 0
+1 1
+1 0
+40 0
+1 1
+1 0
+100 0
+1 770
+10 0 l_dev.ppm
+1 0 @$dev_open,$dev_run
+1 2
+1 0
+10 0
+# game over, back to the title, CONTINUE the normal save: locked again
+1 0 !$R+20=1
+1 0 !$R+28=0
+1 0 !$R+48=0
+5 0
+1 0 @$R+20
+300 0 l_over.ppm
+1 2
+1 0
+30 0
+1 8
+1 0
+5 0
+1 1
+1 0
+40 0
+1 1
+1 0
+100 0
+1 770
+10 0 l_cont.ppm
+1 0 @$dev_open,$dev_run,$level

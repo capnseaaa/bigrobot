@@ -1,15 +1,8 @@
 # dev menu: go to level, safe eyes, god mode, level up
 60 0
-1 8
+1 772
 1 0
-20 0
-1 1
-1 0
-20 0
-1 1
-1 0
-1380 0
-30 0
+10 0
 1 1
 1 0
 40 0

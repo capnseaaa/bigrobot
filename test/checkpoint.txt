@@ -1,0 +1,25 @@
+# halfway checkpoint: reach it, die, TRY AGAIN starts there; clearing the level moves on
+60 0
+1 772
+1 0
+10 0
+1 1
+1 0
+40 0
+1 1
+1 0
+60 0
+1 0 !$cam=880
+60 16
+20 16 p_check.ppm
+1 0 @$checkpoint_level,$cam
+1 0 !$R+28=5
+1 0 !$phase=5
+200 0 p_over.ppm
+1 1
+1 0
+40 0 p_card.ppm
+1 1
+1 0
+30 0 p_retry.ppm
+1 0 @$cam,$checkpoint_level

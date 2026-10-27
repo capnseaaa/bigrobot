@@ -50,12 +50,14 @@ enum { U_HAND, U_EYE, U_STOMP, U_SLAM, U_ARMOR, U_THUNDER, U_SPEED, U_POWER, U_C
 extern u8 up_lv[U_COUNT];
 extern int level;          // 1..LAST_LEVEL
 extern u32 squished;
-// dev menu (L+R+B in a level): test switches, cleared by a new game
+// dev menu (L+R+B in a level, only in runs started from the secret level select):
+// test switches, cleared by a new game or CONTINUE
 enum { DV_NOENEMY, DV_GOD, DV_ONEHIT, DV_NOCOOL, DV_SAFEEYE, DV_FAST, DV_COUNT };
 extern u8 dev_sw[DV_COUNT];
-extern int dev_run;        // no saving for this run
+extern int dev_run;        // a level-select run: dev menu allowed, no saving
 void max_upgrades(void);
 extern int hard;           // hard mode for this run
+extern int checkpoint_level;   // the level whose halfway checkpoint was reached (TRY AGAIN starts there)
 extern u32 play_frames;    // run stats, saved with the game
 extern int bosses_beaten, deaths, worlds;
 extern int plv, xp;        // player level and experience toward the next one

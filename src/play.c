@@ -1599,6 +1599,7 @@ static int dev_update(void) {
         break;
     case DM_GOTO:
         level = dev_lv;
+        checkpoint_level = 0;
         dev_open = 0;
         return EV_GOTO;
     }
@@ -1685,6 +1686,15 @@ void play_enter(void) {
     shown_frame = -1;
     spawn_t = 90;
     next_heart = 450;
+    // TRY AGAIN after the halfway checkpoint: start from there
+    if (checkpoint_level == level && level != LAST_LEVEL && !dev_sw[DV_NOENEMY]) {
+        cam = level_len / 2;
+        R.x = F8(cam + 60);
+        next_heart = cam + 300;
+        bg_x[1] = cam;
+        bg_x[2] = cam >> 1;
+        bg_x[3] = cam >> 2;
+    }
     rush_i = 0;
     paused = 0;
     shake_t = shake_m = 0;
@@ -1724,12 +1734,12 @@ int play_update(void) {
         draw_world();
         return ev;
     }
-    // L+R+B together: open the dev menu (a thunderclap that just started from L+R is refunded)
-    if ((keys & (KEY_L | KEY_R | KEY_B)) == (KEY_L | KEY_R | KEY_B) && (pressed & (KEY_L | KEY_R | KEY_B)) &&
+    // L+R+B together: open the dev menu, only in runs started from the secret level select
+    // (a thunderclap that just started from L+R is refunded)
+    if (dev_run && (keys & (KEY_L | KEY_R | KEY_B)) == (KEY_L | KEY_R | KEY_B) && (pressed & (KEY_L | KEY_R | KEY_B)) &&
         !lvlup && !paused && phase != PH_BOOM && phase != PH_DEAD && phase != PH_CLEAR) {
         if (R.st == RS_CLAP && R.t < 10) { R.st = RS_FREE; R.claps++; }
         dev_open = 1;
-        dev_run = 1;
         dev_lv = level;
         dev_sel = 0;
         dev_screen();
@@ -1812,6 +1822,13 @@ int play_update(void) {
             }
             spawn_t = imax(20, 62 - level * 2) + rndr(35);
             if (hard) spawn_t = spawn_t * 2 / 3;
+        }
+        // halfway: a checkpoint for TRY AGAIN
+        if (checkpoint_level != level && cam >= level_len / 2 && !dev_sw[DV_NOENEMY]) {
+            checkpoint_level = level;
+            set_banner("CHECKPOINT!", "TRY AGAIN STARTS HERE", 130);
+            sfx(SFX_PICKUP);
+            pickup_add(PK_HEART, cam + 200, -16, R.gy);
         }
         if (cam >= next_heart) {
             pickup_add(PK_HEART, cam + 190 + rndr(30), -16, LANE_TOP + rndr(LANE_BOT - LANE_TOP));

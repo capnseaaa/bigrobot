@@ -11,9 +11,10 @@ u8 up_lv[U_COUNT];
 int level = 1;
 u32 squished;
 int plv, xp;
-int dev_run;                      // level select or dev menu used: do not overwrite the save
+int dev_run;                      // started from the secret level select: dev menu allowed, no saving
 u8 dev_sw[DV_COUNT];
 int hard;
+int checkpoint_level;
 u32 play_frames;
 int bosses_beaten, deaths, worlds;
 
@@ -357,6 +358,9 @@ static void continue_game(void) {
     u8 b[SAVE_SIZE];
     sram_read(0, b, SAVE_SIZE);
     level = b[4];
+    dev_run = 0;   // a continued save is a normal game: no dev menu
+    checkpoint_level = 0;
+    for (int i = 0; i < DV_COUNT; i++) dev_sw[i] = 0;
     hard = 0;
     play_frames = 0;
     bosses_beaten = deaths = worlds = 0;
@@ -392,6 +396,7 @@ static void new_game(void) {
     squished = 0;
     plv = xp = 0;
     hard = 0;
+    checkpoint_level = 0;
     play_frames = 0;
     bosses_beaten = deaths = worlds = 0;
     dev_run = 0;
@@ -567,6 +572,7 @@ void goto_scene(int s) {
         } else {
             txt_big_center(6, b);
             txt_center(10, theme_names[(level - 1) / 3 < THEME_COUNT ? (level - 1) / 3 : THEME_COUNT - 1], 0);
+            if (checkpoint_level == level) txt_center(12, "FROM THE CHECKPOINT", 1);
         }
         if (hard) txt_center(15, "HARD MODE", 1);
         break;
@@ -720,12 +726,19 @@ static void scene_update(void) {
         }
         if (st_t > 61 && (pressed & (KEY_A | KEY_START))) {
             if (st_sel == 1) {
-                // start over keeps the mode and the count of worlds ended
-                int h = hard, w = worlds;
+                // start over keeps the mode, the count of worlds ended, and a dev run's dev mode
+                int h = hard, w = worlds, d = dev_run;
+                u8 sw[DV_COUNT];
+                for (int i = 0; i < DV_COUNT; i++) sw[i] = dev_sw[i];
                 new_game();
                 hard = h;
                 worlds = w;
-            } else level = 1;
+                dev_run = d;
+                for (int i = 0; i < DV_COUNT; i++) dev_sw[i] = sw[i];
+            } else {
+                level = 1;
+                checkpoint_level = 0;
+            }
             sfx(SFX_SELECT);
             goto_scene(SC_CARD);
         }
@@ -754,6 +767,7 @@ static void scene_update(void) {
         txt(6, 11, dev_max ? "L  UPGRADES: MAXED" : "L  UPGRADES: NONE ", 1);
         txt(6, 13, dev_boss ? "R  ENEMIES:  OFF  " : "R  ENEMIES:  ON   ", 1);
         txt_center(16, "UP/DOWN   A START   B BACK", 1);
+        txt_center(18, "L+R+B IN A LEVEL: DEV MENU", 0);
         if (pressed & KEY_A) {
             new_game();
             level = st_sel;
